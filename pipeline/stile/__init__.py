@@ -12,8 +12,10 @@ Befund im Protokoll. Ein halbes Bild geht nie raus.
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 
+from .. import rechtschreibung
 from ..kern import konfig, lesen, log, pfad, schreiben, takes
 from . import instagram, pinterest, threads, tiktok
 from .gemeinsam import gesperrt
@@ -79,8 +81,35 @@ def _rendern(plattform: str, art: str, stil: str, daten: dict):
     return ([bild] if bild is not None and not befund else []), befund
 
 
-def _kuerzen(plattform: str, stil: str, felder: dict, befund: str) -> dict | None:
-    """Eine Nachfrage mit dem Pixelbefund. Gibt neue Felder zurück oder None."""
+# Felder, deren Satzzahl beim Kürzen unverändert bleiben muss (an . ! ? gezählt).
+TITELFELDER = {"titel", "pin_titel", "frage"}
+
+
+def _saetze_zahl(text: str) -> int:
+    return len(re.findall(r"[.!?](?=\s|$)", str(text or "")))
+
+
+def _kuerzung_gueltig(alt: dict, neu: dict) -> bool:
+    """Kürzen darf keine Felder verlieren und keine Listen verkürzen; Titelfelder
+    behalten ihre Satzzahl. Sonst hat das Modell nicht gekürzt, sondern Inhalt
+    gestrichen (Lehre aus dem Cashflow-Betrieb, 28.09.2026:
+    `insta-sop/pinterest_bauen.py`, dort per Pixelmessung im Bild entdeckt,
+    hier vorher als Strukturprüfung, damit erst gar kein beschädigtes Bild
+    entsteht)."""
+    for schluessel, wert in alt.items():
+        if schluessel not in neu:
+            return False
+        if isinstance(wert, list) and len(neu.get(schluessel) or []) < len(wert):
+            return False
+        if schluessel in TITELFELDER and isinstance(wert, str):
+            if _saetze_zahl(neu.get(schluessel)) != _saetze_zahl(wert):
+                return False
+    return True
+
+
+def _kuerzen(plattform: str, stil: str, felder: dict, befund: str) -> tuple[dict | None, str | None]:
+    """Eine Nachfrage mit dem Pixelbefund. Gibt (neue Felder, None) zurück, oder
+    (None, Grund) wenn keine Antwort kam oder sie die Struktur verletzt hat."""
     auftrag = (f"Diese Bildtexte für den Stil {plattform}/{stil} passen nicht ins Bild. "
                f"Befund: {befund}\nKürze so, dass es passt. Gleiche Aussage, gleiche Felder, "
                f"Zahl im Titel gleich der Zahl der Punkte. Nur JSON mit den Feldern.\n"
@@ -88,8 +117,53 @@ def _kuerzen(plattform: str, stil: str, felder: dict, befund: str) -> dict | Non
     try:
         neu = frage(auftrag, zweck="bildtexte_kuerzen", rueckfall=lambda: None)
     except Exception:
-        return None
-    return neu if isinstance(neu, dict) else None
+        return None, None
+    if not isinstance(neu, dict):
+        return None, None
+    if not _kuerzung_gueltig(felder, neu):
+        return None, "Kürzung hat Inhalt gestrichen"
+    return neu, None
+
+
+def _textfelder(eintrag: dict) -> dict[str, str]:
+    """Alle Textstücke eines Bildeintrags, flach, für die Rechtschreibprüfung."""
+    ausgabe: dict[str, str] = {}
+    for schluessel, wert in (eintrag.get("felder") or {}).items():
+        if isinstance(wert, str):
+            ausgabe[schluessel] = wert
+        elif isinstance(wert, list):
+            for index, teil in enumerate(wert):
+                if isinstance(teil, str):
+                    ausgabe[f"{schluessel}_{index}"] = teil
+    for schluessel in ("text", "pin_titel"):
+        if isinstance(eintrag.get(schluessel), str):
+            ausgabe[schluessel] = eintrag[schluessel]
+    return ausgabe
+
+
+def _rechtschreibung_pruefen(ident: str, eintrag: dict) -> list[str]:
+    """Rechtschreibprüfung nach dem Modellurteil, wie in texte.py: eine
+    Nachfrage mit dem Befund, dann erneut prüfen. Bleiben Fehler, bleiben sie
+    als Befund am Bild stehen; das Bild wird trotzdem gebaut (ARCHITEKTUR.md:
+    ein Befund stoppt nichts, er muss sichtbar sein)."""
+    befunde = rechtschreibung.pruefe(_textfelder(eintrag))
+    if not befunde:
+        return []
+    auftrag = (
+        f"Dieser Bildbeitrag ({ident}, JSON) hat Rechtschreib- oder Grammatikfehler:\n- "
+        + "\n- ".join(befunde)
+        + "\nKorrigiere genau das. Gleiche Aussage, gleiche Felder, gleiche Anzahl Punkte. "
+          "Antworte nur mit dem vollständigen, korrigierten JSON-Objekt.\n\n"
+        + json.dumps(eintrag, ensure_ascii=False)
+    )
+    try:
+        neu = frage(auftrag, zweck="rechtschreibung_bild", rueckfall=lambda: None)
+    except Exception:
+        neu = None
+    if not isinstance(neu, dict):
+        return befunde
+    eintrag.update({k: v for k, v in neu.items() if k in ("felder", "text", "pin_titel")})
+    return rechtschreibung.pruefe(_textfelder(eintrag))
 
 
 def _texte_je_plattform(plattform: str, eintrag: dict) -> dict:
@@ -135,17 +209,20 @@ def befehl(args) -> int:
             if eintrag.get("passt_nicht"):
                 log(f"befund: {ident}: passt nicht zu diesem Material ({eintrag['passt_nicht']})")
                 continue
+            rechtschreib_befunde = _rechtschreibung_pruefen(ident, eintrag)
             felder = eintrag.get("felder", {}) or {}
             ordner = pfad("ausgabe", "bilder", ident)
             dateien: list[str] = []
             if not (plattform == "threads" and stil != "bild_zeile"):
                 bilder, befund = _rendern(plattform, art, stil, _felder_fuer_renderer(plattform, felder, take.name, stil))
                 if not bilder and befund:
-                    gekuerzt = _kuerzen(plattform, stil, felder, befund)
+                    gekuerzt, kuerzungs_befund = _kuerzen(plattform, stil, felder, befund)
                     if gekuerzt:
                         felder = gekuerzt
                         bilder, befund = _rendern(plattform, art, stil,
                                                   _felder_fuer_renderer(plattform, felder, take.name, stil))
+                    elif kuerzungs_befund:
+                        befund = kuerzungs_befund
                 if not bilder:
                     log(f"befund: {ident}: kein Bild ({befund or 'Renderer lieferte nichts'})")
                     continue
@@ -154,9 +231,11 @@ def befehl(args) -> int:
                 eintrag["text"] = felder.get("text", "")
             texte = {plattform: _texte_je_plattform(plattform, eintrag)}
             schreiben(ordner / "bild.json", _manifest(ident, take.name, plattform, "text" if plattform == "threads" else art,
-                                                      stil, dateien, texte))
+                                                      stil, dateien, texte, rechtschreib_befunde))
             redaktion.vermerken(benutzt, plattform, stil)
             erledigt.append(ident)
-            log(f"ok: {ident} ({len(dateien)} Bild{'er' if len(dateien) != 1 else ''})")
+            status = "befund" if rechtschreib_befunde else "ok"
+            log(f"{status}: {ident} ({len(dateien)} Bild{'er' if len(dateien) != 1 else ''})"
+                + ("; " + "; ".join(rechtschreib_befunde) if rechtschreib_befunde else ""))
         schreiben(merker, {"gebaut": erledigt})
     return 1 if fehler else 0

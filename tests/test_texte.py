@@ -245,6 +245,72 @@ def test_nachfrage_bei_verstoss(monkeypatch, repo):
 
 
 # ---------------------------------------------------------------------------
+# Rechtschreibprüfung nach dem Modellurteil: eine Nachfrage, dann erneut prüfen.
+# `texte.rechtschreibung.pruefe` ist gemockt, kein echtes Netz.
+# ---------------------------------------------------------------------------
+
+def _vorbereiten(repo):
+    ordner = repo / "arbeit" / "take" / "stuecke" / "01"
+    ordner.mkdir(parents=True)
+    schreiben(ordner / "rezept.json", {"id": "take-01", "take": "take", "nr": 1, "von_stuecken": 1, "titel": "Ein Titel", "aussage": "Eine Aussage"})
+    schreiben(repo / "arbeit" / "take" / "saetze.json", [{"nr": 1, "text": "Dieser Satz ist der klare Hook für heute."}])
+
+
+def test_rechtschreibung_nachfrage_behebt_den_fehler(monkeypatch, repo):
+    _vorbereiten(repo)
+    rs_calls: list[int] = []
+
+    def fake_frage(auftrag, *, zweck, rueckfall=None, pruefe=None):
+        if zweck == "texte_instagram":
+            antwort = {"caption": CAPTION_GUT}
+            assert pruefe(antwort) is None
+            return antwort
+        if zweck == "rechtschreibung_instagram":
+            assert "Testfehler" in auftrag
+            return {"caption": CAPTION_GUT}
+        return rueckfall()
+
+    def fake_rs_pruefe(daten):
+        text = daten.get("caption") or daten.get("text") or ""
+        if text == CAPTION_GUT and not rs_calls:
+            rs_calls.append(1)
+            return ["„Testfehler“: Tippfehler, Vorschlag „Testwort“"]
+        return []
+
+    monkeypatch.setattr(texte, "frage", fake_frage)
+    monkeypatch.setattr(texte.rechtschreibung, "pruefe", fake_rs_pruefe)
+    assert texte.befehl(SimpleNamespace(ziel=["take-01"], neu=True)) == 0
+    daten = lesen(repo / "ausgabe" / "take-01" / "texte.json")
+    assert daten["instagram"]["caption"] == CAPTION_GUT
+    assert daten["befunde"] == []
+
+
+def test_rechtschreibung_befund_bleibt_am_stueck_wenn_ungeloest(monkeypatch, repo):
+    _vorbereiten(repo)
+
+    def fake_frage(auftrag, *, zweck, rueckfall=None, pruefe=None):
+        if zweck == "texte_instagram":
+            antwort = {"caption": CAPTION_GUT}
+            assert pruefe(antwort) is None
+            return antwort
+        if zweck == "rechtschreibung_instagram":
+            return {"caption": CAPTION_GUT}  # "korrigiert" nichts wirklich
+        return rueckfall()
+
+    def fake_rs_pruefe(daten):
+        text = daten.get("caption") or daten.get("text") or ""
+        return ["„Testfehler“: Tippfehler"] if text == CAPTION_GUT else []
+
+    monkeypatch.setattr(texte, "frage", fake_frage)
+    monkeypatch.setattr(texte.rechtschreibung, "pruefe", fake_rs_pruefe)
+    assert texte.befehl(SimpleNamespace(ziel=["take-01"], neu=True)) == 0
+    daten = lesen(repo / "ausgabe" / "take-01" / "texte.json")
+    # Der Text bleibt stehen, er wird nicht verworfen - nur der Befund wird sichtbar.
+    assert daten["instagram"]["caption"] == CAPTION_GUT
+    assert any("Testfehler" in b for b in daten["befunde"])
+
+
+# ---------------------------------------------------------------------------
 # Bestehende Integrationstests
 # ---------------------------------------------------------------------------
 

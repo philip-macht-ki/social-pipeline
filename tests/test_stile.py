@@ -6,6 +6,7 @@ echte gerenderte Größen und Farben, nie geschätzte Werte.
 """
 from __future__ import annotations
 
+from pipeline import stile as stile_paket
 from pipeline.stile import pinterest_auswahl
 from pipeline.stile import pinterest, instagram, tiktok, threads
 from pipeline.stile.gemeinsam import MINDESTKONTRAST, kontrast
@@ -158,3 +159,52 @@ def test_stilauswahl_respektiert_je_lauf(repo):
     cfg["pinterest"]["je_lauf"] = 3
     auswahl = pinterest_auswahl({}, cfg, "2026-01-02")
     assert len(auswahl) == 3
+
+
+# ---------------------------------------------------------------------------
+# Strukturprüfung nach dem Kürzen (_kuerzen/_kuerzung_gueltig): keine verlorenen
+# Felder, keine verkürzten Listen, Titelfelder behalten ihre Satzzahl. Lehre aus
+# dem Cashflow-Betrieb, 28.09.2026 (insta-sop/pinterest_bauen.py).
+# ---------------------------------------------------------------------------
+
+def test_kuerzung_verwirft_gestrichenen_satz_im_titel(monkeypatch, repo):
+    alt = {"titel": "Erster Satz. Zweiter Satz.", "punkte": ["eins", "zwei", "drei"]}
+    neu = {"titel": "Erster Satz.", "punkte": ["eins", "zwei", "drei"]}  # ein Satz im Titel fehlt
+    monkeypatch.setattr(stile_paket, "frage", lambda *a, **k: neu)
+    ergebnis, grund = stile_paket._kuerzen("pinterest", "spickzettel", alt, "120 px zu breit")
+    assert ergebnis is None
+    assert grund == "Kürzung hat Inhalt gestrichen"
+
+
+def test_kuerzung_verwirft_gekuerzte_liste(monkeypatch, repo):
+    alt = {"titel": "Ein Satz.", "punkte": ["eins", "zwei", "drei"]}
+    neu = {"titel": "Ein Satz.", "punkte": ["eins", "zwei"]}  # ein Punkt fehlt
+    monkeypatch.setattr(stile_paket, "frage", lambda *a, **k: neu)
+    ergebnis, grund = stile_paket._kuerzen("pinterest", "spickzettel", alt, "Text zu lang")
+    assert ergebnis is None
+    assert grund == "Kürzung hat Inhalt gestrichen"
+
+
+def test_kuerzung_verwirft_fehlendes_feld(monkeypatch, repo):
+    alt = {"titel": "Ein Satz.", "unter": "Ein Merksatz.", "punkte": ["eins", "zwei"]}
+    neu = {"titel": "Ein Satz.", "punkte": ["eins", "zwei"]}  # "unter" fehlt komplett
+    monkeypatch.setattr(stile_paket, "frage", lambda *a, **k: neu)
+    ergebnis, grund = stile_paket._kuerzen("pinterest", "spickzettel", alt, "zu lang")
+    assert ergebnis is None
+    assert grund == "Kürzung hat Inhalt gestrichen"
+
+
+def test_kuerzung_gueltig_wird_uebernommen(monkeypatch, repo):
+    alt = {"titel": "Ein Satz. Noch einer.", "punkte": ["eins", "zwei", "drei"]}
+    neu = {"titel": "Kurz. Noch einer.", "punkte": ["eins", "zwei", "drei"]}  # gleiche Satzzahl, kürzer
+    monkeypatch.setattr(stile_paket, "frage", lambda *a, **k: neu)
+    ergebnis, grund = stile_paket._kuerzen("pinterest", "spickzettel", alt, "zu breit")
+    assert ergebnis == neu
+    assert grund is None
+
+
+def test_kuerzung_ohne_antwort_liefert_keinen_grund(monkeypatch, repo):
+    alt = {"titel": "Ein Satz.", "punkte": ["eins"]}
+    monkeypatch.setattr(stile_paket, "frage", lambda *a, **k: None)
+    ergebnis, grund = stile_paket._kuerzen("pinterest", "spickzettel", alt, "zu breit")
+    assert ergebnis is None and grund is None

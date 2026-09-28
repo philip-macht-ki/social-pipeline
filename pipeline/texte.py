@@ -1,9 +1,11 @@
 """Texte je Plattform. Grenzen werden nach dem Urteil immer im Code geprüft."""
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
+from . import rechtschreibung
 from .kern import Ergebnis, konfig, lesen, log, pfad, schreiben, stueck_ordner, stuecke
 from .urteil import frage, vorlage
 
@@ -156,6 +158,31 @@ def _fallbacks(rezept: dict, hook: str, marke: dict) -> dict:
     }
 
 
+def _rechtschreib_pruefen(plattform: str, daten: dict, pruefung) -> tuple[dict, list[str]]:
+    """Rechtschreibprüfung nach dem Modellurteil. Bei Fehlern eine Nachfrage mit
+    dem Befund (wie `urteil.frage` es sonst bei einem Mangel selbst tut), dann
+    erneut prüfen. Bleiben Fehler übrig, bleibt der Text stehen und der Befund
+    wird gemeldet statt das Stück zu verwerfen (Lehre aus dem Cashflow-Betrieb,
+    28.09.2026: ein Befund am Stück ist besser als ein verschluckter Fehler)."""
+    befunde = rechtschreibung.pruefe(daten)
+    if not befunde:
+        return daten, []
+    auftrag = (
+        f"Dieser Text für {plattform} hat Rechtschreib- oder Grammatikfehler:\n- "
+        + "\n- ".join(befunde)
+        + "\nKorrigiere genau das. Inhalt, Ton und Länge bleiben gleich. Antworte nur "
+          "mit dem vollständigen, korrigierten JSON-Objekt.\n\n"
+        + json.dumps(daten, ensure_ascii=False)
+    )
+    try:
+        neu = frage(auftrag, zweck="rechtschreibung_" + plattform, rueckfall=lambda: None)
+    except Exception:
+        neu = None
+    if isinstance(neu, dict) and pruefung(neu) is None:
+        return neu, rechtschreibung.pruefe(neu)
+    return daten, befunde
+
+
 def _machen(ordner: Path) -> Ergebnis:
     rezept = lesen(ordner / "rezept.json", {})
     take = rezept.get("take") or ordner.parents[2].name
@@ -196,6 +223,10 @@ def _machen(ordner: Path) -> Ergebnis:
         if befund:
             befunde.append(f"{plattform}: {befund}")
             ergebnisse[plattform] = rueckfaelle[plattform]
+        else:
+            ergebnisse[plattform], rs_befunde = _rechtschreib_pruefen(
+                plattform, ergebnisse[plattform], pruefung)
+            befunde.extend(f"{plattform}: {b}" for b in rs_befunde)
     # Der Link mit UTM-Parametern ist immer der Code, nie das Modellergebnis (siehe pruefe_pinterest).
     if isinstance(ergebnisse.get("pinterest"), dict):
         ergebnisse["pinterest"]["link"] = _utm(marke.get("link", ""))

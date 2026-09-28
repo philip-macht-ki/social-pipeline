@@ -14,6 +14,8 @@ import subprocess
 import sys
 from datetime import datetime, timedelta
 
+import requests
+
 from .kern import jetzt, konfig, lesen, pfad
 from .schrift import schrift
 
@@ -101,6 +103,20 @@ def befehl(args) -> int:
             zeile("GELB", f"Instagram-Token läuft am {ablauf:%d.%m.%Y} ab", hinweis)
         else:
             zeile("GRUEN", f"Instagram-Token gültig bis {ablauf:%d.%m.%Y}")
+
+    rechtschreib_cfg = konfig("pipeline").get("rechtschreibung", {})
+    if not rechtschreib_cfg.get("an", False):
+        zeile("GELB", "Rechtschreibprüfung ist aus",
+              "[rechtschreibung] an = true in konfig/pipeline.toml setzen, wenn gewünscht.")
+    else:
+        dienst = rechtschreib_cfg.get("dienst") or "https://api.languagetool.org/v2/check"
+        try:
+            probe = requests.post(dienst, data={"text": "Das ist ein Test.", "language": "de-DE"}, timeout=5)
+            probe.raise_for_status()
+            zeile("GRUEN", f"Rechtschreibprüfung erreichbar ({dienst})")
+        except Exception as e:
+            zeile("GELB", f"Rechtschreibprüfung nicht erreichbar: {e}",
+                  "Netz prüfen, oder [rechtschreibung] an = false setzen, wenn nicht gebraucht.")
 
     urteil_backend = konfig("pipeline").get("urteil", {}).get("backend", "claude")
     if urteil_backend == "ohne" or shutil.which(urteil_backend):

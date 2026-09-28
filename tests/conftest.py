@@ -22,6 +22,14 @@ def repo(tmp_path, monkeypatch):
         shutil.copytree(ECHT / ordner, tmp_path / ordner)
     for ordner in ("eingang", "arbeit", "ausgabe", "medien/hintergruende"):
         (tmp_path / ordner).mkdir(parents=True, exist_ok=True)
+    # Tests laufen ohne echtes Netz: die Rechtschreibprüfung ist standardmäßig
+    # aus, egal was in der echten konfig/pipeline.toml steht. Ein Test, der sie
+    # gezielt prüfen will, mockt `rechtschreibung.pruefe` selbst (siehe
+    # tests/test_rechtschreibung.py, tests/test_texte.py).
+    pipeline_toml = tmp_path / "konfig" / "pipeline.toml"
+    alt = pipeline_toml.read_text(encoding="utf-8")
+    neu = alt.replace("[rechtschreibung]\nan = true", "[rechtschreibung]\nan = false")
+    pipeline_toml.write_text(neu, encoding="utf-8")
     monkeypatch.setattr(kern, "ROOT", tmp_path)
     monkeypatch.setenv("PIPELINE_ROOT", str(tmp_path))
     monkeypatch.setenv("URTEIL_BACKEND", "ohne")

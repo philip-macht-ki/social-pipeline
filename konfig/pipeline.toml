@@ -26,6 +26,14 @@ zoom_stufen = [1.0, 1.15]
 augenlinie = 0.36
 blende_segment = 0.12
 
+[rechtschreibung]
+an = true
+dienst = "https://api.languagetool.org/v2/check"
+# Wörter, die LanguageTool sonst als Fehler markiert, aber keine sind
+# (eigene Begriffe, Produktnamen). Platt- und Werkzeugnamen sind schon fest
+# eingebaut, siehe pipeline/rechtschreibung.py.
+ausnahmen = []
+
 [freigabe]
 pauschal = false
 
