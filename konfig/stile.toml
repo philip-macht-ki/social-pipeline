@@ -1,0 +1,27 @@
+# Welche Stile je Plattform im Wechsel laufen. Was hier fehlt, wird nie gebaut.
+# Ein Stil, der nicht mehr gefällt, kommt nach "gesperrt" statt gelöscht zu werden:
+# so bleibt nachvollziehbar, warum er fehlt.
+
+[instagram]
+reel = ["klar", "titelband", "stichworte"]
+bild = ["zitat_standbild", "zahl", "einwand", "vorher_nachher", "raster", "notiz"]
+karussell = ["schritte", "kette", "woche_hell"]
+gesperrt = []
+
+[tiktok]
+video = ["klar", "stichworte"]
+fotobeitrag = ["foto_schritte", "foto_zitat"]
+gesperrt = []
+
+[youtube]
+short = ["klar", "titelband"]
+
+[pinterest]
+pin = ["spickzettel", "szene", "notizbuch", "editorial", "typomix", "tabelle", "toolraster", "statistik"]
+# je Lauf werden die zwei am wenigsten benutzten gebaut, kein Stil zweimal am Tag
+je_lauf = 2
+gesperrt = []
+
+[threads]
+text = ["merksatz", "einwand", "zahl", "frage", "kette", "bild_zeile"]
+gesperrt = []

@@ -1,0 +1,58 @@
+# Einsteiger-Raster. Die zehn Plätze des Vorbilds bleiben bewusst Kommentar.
+[instagram]
+an = true
+# upload_post: einfachster Start, ein Schlüssel für alles (Modul S5, Lektion 1).
+# instagram_api: eigene Meta-App, keine Monatsgebühr, braucht eine öffentliche
+# Adresse für die Dateien (medien_weg unten, Modul S5, Lektion 2).
+weg = "upload_post"
+slots = [{ zeit = "09:40", art = "reel" }, { zeit = "13:00", art = "bild" }, { zeit = "17:40", art = "reel" }]
+# slots = [{zeit="07:00",art="reel"},{zeit="08:20",art="karussell"},{zeit="09:40",art="reel"},{zeit="11:00",art="reel"},{zeit="12:20",art="bild"},{zeit="13:40",art="reel"},{zeit="15:00",art="reel"},{zeit="16:20",art="karussell"},{zeit="17:40",art="reel"},{zeit="19:00",art="reel"}]
+tagesdeckel = 10
+mindestabstand_minuten = 80
+nachtruhe = ["20:00", "07:00"]
+api_version = "v21.0"
+medien_weg = "basis_url"
+medien_ordner = "arbeit/oeffentlich"
+basis_url = "https://example.invalid/medien/"
+
+[tiktok]
+an = true
+weg = "upload_post"
+# "bild" nimmt Fotobeiträge (TikTok zeigt sie als Wischbilder mit Musik).
+slots = [{ zeit = "12:30", art = "reel" }, { zeit = "16:00", art = "bild" }, { zeit = "18:30", art = "reel" }]
+tagesdeckel = 4
+mindestabstand_minuten = 60
+nachtruhe = ["22:00", "07:00"]
+# Ohne bestandenes Audit kommt alles privat heraus. Nach Audit kann tiktok_api ergänzt werden.
+privacy_level = "SELF_ONLY"
+
+[youtube]
+an = true
+weg = "youtube_api"
+slots = [{ zeit = "19:00", art = "short" }]
+tagesdeckel = 3
+mindestabstand_minuten = 60
+nachtruhe = ["00:00", "00:00"]
+kategorie = "22"
+max_laenge_s = 179
+max_uploads_24h = 3
+
+[pinterest]
+an = true
+weg = "upload_post"
+slots = [{ zeit = "11:30", art = "pin" }, { zeit = "20:15", art = "pin" }]
+tagesdeckel = 2
+mindestabstand_minuten = 60
+nachtruhe = ["00:00", "00:00"]
+board_id = ""
+# Thema zu Board: Konfiguration unten ergänzen, zum Beispiel "Tipps" = "Board-ID".
+
+[threads]
+an = true
+weg = "upload_post"
+# genau ein Thema je Beitrag, ohne #. Threads zeigt es als Themen-Tag.
+topic_tag = "Selbstständigkeit"
+slots = [{ zeit = "08:20", art = "text" }, { zeit = "17:40", art = "bild" }]
+tagesdeckel = 4
+mindestabstand_minuten = 60
+nachtruhe = ["00:00", "00:00"]

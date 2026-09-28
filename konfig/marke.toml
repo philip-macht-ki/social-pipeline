@@ -1,0 +1,29 @@
+# Variable Schriften tragen ihr Gewicht hinter @ (400 normal, 700 fett).
+# Deine Marke. Alles, was in Bildern, Titeln und Texten von dir erzählt,
+# kommt von hier. Farben als Hex, Schriften aus dem Ordner schriften/.
+
+name = "Deine Marke"
+handle = "@deinhandle"
+# klein auf jedem Stück, in Versalien
+wortmarke = "DEINE MARKE"
+# ein Satz: für wen du sprichst. Steht in jedem Auftrag ans Modell.
+zielgruppe = "Selbstständige, die mit KI Zeit sparen wollen"
+link = "https://example.de"
+# steht in Instagram-Captions vor den Hashtags. Leer lassen = kein Aufruf.
+cta_zeile = "Mehr dazu findest du über den Link im Profil."
+hashtags = ["#selbststaendig", "#ki"]
+
+[farben]
+akzent = "#E8590C"
+dunkel = "#1B1A2E"
+hell = "#FBF5EC"
+grau = "#5B5A6E"
+
+[schriften]
+titel = "Newsreader-Variabel.ttf@600"
+text = "InstrumentSans-Variabel.ttf@700"
+text_normal = "InstrumentSans-Variabel.ttf@400"
+block = "Anton-Regular.ttf"
+hand = "Caveat-Bold.ttf"
+serif = "DMSerifDisplay-Regular.ttf"
+schreibschrift = "Pacifico-Regular.ttf"

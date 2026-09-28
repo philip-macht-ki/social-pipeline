@@ -1,0 +1,20 @@
+[instagram]
+oben = 270
+unten = 300
+rechts = 70
+[tiktok]
+oben = 270
+unten = 520
+rechts = 90
+[youtube]
+oben = 270
+unten = 300
+rechts = 70
+[pinterest]
+oben = 80
+unten = 80
+rechts = 60
+[threads]
+oben = 80
+unten = 80
+rechts = 60

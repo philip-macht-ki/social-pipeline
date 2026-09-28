@@ -1,0 +1,8 @@
+arbeit/
+eingang/
+ausgabe/
+.env
+__pycache__/
+*.mov
+*.mp4
+!beispiel/README.md

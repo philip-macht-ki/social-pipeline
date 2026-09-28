@@ -1,0 +1,38 @@
+[urteil]
+backend = "claude"
+modell = "sonnet"
+
+[transkript]
+backend = "mlx"
+modell = "mlx-community/whisper-large-v3-turbo"
+
+sprache = "de"
+zeitzone = "Europe/Berlin"
+gesamtzeit_minuten = 50
+
+[schnitt]
+min_laenge = 30
+max_laenge = 170
+pausen_ab = 0.9
+entspiegeln = false
+belichtung = true
+# Ab hier: Werte von Team B (Rohschnitt/Fassungen), siehe pipeline/schnitt.py.
+pause_ziel = 0.28
+max_segment = 9.0
+vorlauf = 0.14
+nachlauf = 0.40
+ausklang_max = 0.6
+zoom_stufen = [1.0, 1.15]
+augenlinie = 0.36
+blende_segment = 0.12
+
+[freigabe]
+pauschal = false
+
+[plan]
+tage = 7
+
+[ordner]
+eingang = "eingang"
+arbeit = "arbeit"
+ausgabe = "ausgabe"

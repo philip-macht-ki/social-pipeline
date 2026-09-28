@@ -1,0 +1,25 @@
+[project]
+name = "social-pipeline"
+version = "0.1.0"
+description = "Lokale Vorlage für eine Social-Media-Pipeline"
+requires-python = ">=3.11"
+dependencies = ["pillow>=10", "numpy>=1.26", "requests>=2.31", "tomli-w>=1.0"]
+
+[project.optional-dependencies]
+mac = ["mlx-whisper>=0.4"]
+whisper = ["faster-whisper>=1.0"]
+youtube = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
+dev = ["pytest>=8"]
+
+[project.scripts]
+pipeline = "pipeline.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pipeline"]
+
+[tool.pytest.ini_options]
+markers = ["langsam: benötigt Whisper und ffmpeg"]
