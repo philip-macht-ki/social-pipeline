@@ -12,8 +12,9 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime, timedelta
 
-from .kern import konfig, pfad
+from .kern import jetzt, konfig, lesen, pfad
 from .schrift import schrift
 
 FILTER = {"scale", "crop", "overlay", "hflip", "curves", "eq", "unsharp", "loudnorm", "concat",
@@ -71,6 +72,36 @@ def befehl(args) -> int:
     else:
         zeile("ROT", f"Transkript {paket} fehlt", f"`uv sync` erneut laufen lassen, {paket} fehlt im Paket.")
 
+    kanaele_cfg = konfig("kanaele")
+    youtube_cfg = kanaele_cfg.get("youtube", {})
+    if youtube_cfg.get("an") and youtube_cfg.get("weg") == "youtube_api":
+        fehlend = [p for p in ("googleapiclient", "google_auth_oauthlib") if not importlib.util.find_spec(p)]
+        if fehlend:
+            zeile("ROT", "YouTube-Pakete fehlen: " + ", ".join(fehlend), "`uv sync --extra youtube`.")
+        else:
+            zeile("GRUEN", "YouTube-Pakete verfügbar")
+
+    instagram_cfg = kanaele_cfg.get("instagram", {})
+    if instagram_cfg.get("weg") == "instagram_api":
+        stand = lesen(pfad("arbeit", "instagram_token.json"), {}) or {}
+        ablauf_text = stand.get("laeuft_ab")
+        ablauf = None
+        if ablauf_text:
+            try:
+                ablauf = datetime.fromisoformat(ablauf_text)
+            except ValueError:
+                ablauf = None
+        hinweis = ("`uv run pipeline instagram-token verlaengern` ausführen, danach eine "
+                   "monatliche geplante Aufgabe dafür einrichten.")
+        if ablauf is None:
+            zeile("GELB", "Instagram-Token: kein Ablaufdatum bekannt", hinweis)
+        elif ablauf <= jetzt():
+            zeile("ROT", "Instagram-Token ist abgelaufen", hinweis)
+        elif ablauf - jetzt() < timedelta(days=14):
+            zeile("GELB", f"Instagram-Token läuft am {ablauf:%d.%m.%Y} ab", hinweis)
+        else:
+            zeile("GRUEN", f"Instagram-Token gültig bis {ablauf:%d.%m.%Y}")
+
     urteil_backend = konfig("pipeline").get("urteil", {}).get("backend", "claude")
     if urteil_backend == "ohne" or shutil.which(urteil_backend):
         zeile("GRUEN", f"Urteil {urteil_backend} verfügbar")
@@ -101,9 +132,13 @@ def befehl(args) -> int:
             zeile("ROT", f"Ordner {ordner} nicht beschreibbar: {e}",
                   f"Zugriffsrechte für {ordner}/ prüfen.")
 
+    # Dieselben Schwellen wie im README, Abschnitt Voraussetzungen: 30 GB ist der Zielwert
+    # für lange Rohvideos, 10 GB die harte Untergrenze.
     frei_gb = shutil.disk_usage(pfad()).free / 1024**3
-    if frei_gb >= 10:
+    if frei_gb >= 30:
         zeile("GRUEN", f"Freier Platz {frei_gb:.1f} GB")
+    elif frei_gb >= 10:
+        zeile("GELB", f"Freier Platz {frei_gb:.1f} GB", "Für lange Aufnahmen 30 GB anstreben.")
     else:
         zeile("ROT", f"Freier Platz {frei_gb:.1f} GB", "Platz freiräumen, mindestens 10 GB nötig.")
 

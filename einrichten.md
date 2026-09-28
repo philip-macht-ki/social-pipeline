@@ -41,8 +41,9 @@ Am Ende steht „Tageslauf fertig“, und es gibt:
    dem Mac-Passwort; das tippt die Person selbst im Terminal ein, nie in den Chat.
 2. **ffmpeg und uv**: `brew install ffmpeg uv`, falls `ffmpeg -version` oder
    `uv --version` fehlen.
-3. **Python-Pakete**: `uv sync --extra mac --extra dev`. Auf einem Mac mit
-   Apple-Chip läuft die Spracherkennung dann lokal.
+3. **Python-Pakete**: `uv sync --extra mac --extra dev --extra youtube`. Auf einem
+   Mac mit Apple-Chip läuft die Spracherkennung dann lokal; `--extra youtube` ist
+   dabei, weil YouTube in `konfig/kanaele.toml` standardmäßig an ist.
 4. **Marke eintragen**: Öffne `konfig/marke.toml` und **frag** nach den
    Angaben aus Abschnitt 5. Trag sie ein. Farben als Hex-Wert; kennt die
    Person ihren Hex-Wert nicht, schlag zwei Farben vor und lass sie wählen.

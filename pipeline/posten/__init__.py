@@ -24,10 +24,12 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from ..kern import dauer, jetzt, konfig, lesen, pfad, schreiben
+from ..kern import Sperre, dauer, jetzt, konfig, lesen, pfad, schreiben
 
 ERLEDIGT = ("laeuft", "offen", "ok")  # zählt als gesendet oder unterwegs
 FAELLIG_HOECHSTENS = timedelta(hours=12)
+# Ab hier gilt ein "laeuft"-Eintrag ohne Nachfolger als abgestürzt, nicht als noch unterwegs.
+HAENGEND_NACH = timedelta(minutes=30)
 
 
 def _protokoll() -> list[dict]:
@@ -133,7 +135,7 @@ def _offene_nachfragen(log: list[dict], plan: dict) -> None:
         if _letzter(log, x["kanal"], x["plan_id"]) is not x:
             continue
         try:
-            stand = upload_post.nachfragen(x["extern_id"])
+            stand = upload_post.nachfragen(x["extern_id"], x["kanal"])
         except Exception as fehler:
             print(f"befund: Nachfrage {x['plan_id']} ({x['kanal']}) klappte nicht: {fehler}")
             continue
@@ -143,13 +145,48 @@ def _offene_nachfragen(log: list[dict], plan: dict) -> None:
                "status": "ok" if stand["zustand"] == "ok" else "fehler", "trocken": False,
                "weg": "upload_post", "extern_id": x["extern_id"], "url": stand.get("url"),
                "antwort": stand.get("antwort")}
+        if stand.get("meldung"):
+            neu["fehler"] = stand["meldung"]
         log.append(neu)
         if x["plan_id"] in eintraege:
             eintraege[x["plan_id"]]["status"] = "veroeffentlicht" if neu["status"] == "ok" else "fehler"
         print(f"{neu['status']}: {x['plan_id']} auf {x['kanal']} ist jetzt {stand['zustand']}")
 
 
-def befehl(args) -> int:
+def _haengend_klaeren(e: dict, vorher: dict, log: list[dict]) -> None:
+    """Ein 'laeuft'-Eintrag ohne Nachfolger, mindestens HAENGEND_NACH alt: der Lauf, der
+    ihn geschrieben hat, ist vermutlich abgestürzt, bevor die Antwort ankam. Neu senden
+    würde einen Doppelpost riskieren, also nur bei Upload-Post mit bekannter Kennung
+    nachfragen; sonst zur Prüfung markieren, statt still zu warten oder blind erneut
+    zu senden."""
+    kennung = vorher.get("extern_id")
+    if vorher.get("weg") == "upload_post" and kennung:
+        from . import upload_post
+        try:
+            stand = upload_post.nachfragen(kennung, e["kanal"])
+        except Exception as fehler:
+            print(f"befund: Nachfrage zum hängenden Lauf {e['id']} klappte nicht: {fehler}")
+        else:
+            if stand["zustand"] != "offen":
+                zeit = jetzt().isoformat(timespec="seconds")
+                status = "ok" if stand["zustand"] == "ok" else "fehler"
+                log.append({"plan_id": e["id"], "kanal": e["kanal"], "zeit": zeit, "status": status,
+                            "trocken": False, "weg": "upload_post", "extern_id": kennung,
+                            "url": stand.get("url"), "antwort": stand.get("antwort")})
+                e["status"] = "veroeffentlicht" if stand["zustand"] == "ok" else "fehler"
+                print(f"{'ok' if stand['zustand'] == 'ok' else 'fehler'}: {e['id']} auf {e['kanal']} "
+                      f"war hängend, jetzt über Upload-Post geklärt")
+                return
+    meldung = ("Senden wurde unterbrochen. Auf der Plattform nachsehen, ob der Beitrag online ist, "
+               f"dann `pipeline freigeben {e['id']}` erneut oder den Eintrag löschen.")
+    log.append({"plan_id": e["id"], "kanal": e["kanal"], "zeit": jetzt().isoformat(timespec="seconds"),
+                "status": "unklar", "trocken": False, "weg": vorher.get("weg")})
+    e["status"] = "pruefen"
+    e.setdefault("befunde", []).append(meldung)
+    print(f"befund: {e['id']} auf {e['kanal']}: {meldung}")
+
+
+def _befehl(args) -> int:
     echt = bool(getattr(args, "echt", False))
     nur = getattr(args, "kanal", None)
     plan, log, now = _plan(), _protokoll(), jetzt()
@@ -165,13 +202,21 @@ def befehl(args) -> int:
         if zeit > now:
             continue
         if now - zeit > FAELLIG_HOECHSTENS:
-            e["status"] = "verpasst"
+            # Trockenlauf meldet nur, er ändert den Plan nicht (sonst verändert eine
+            # Sichtung ungewollt den Stand, bevor überhaupt echt gesendet wurde).
             print(f"befund: {e['id']} ({e['kanal']}) ist über 12 Stunden überfällig, "
                   f"`pipeline planen` legt ihn neu ein.")
+            if echt:
+                e["status"] = "verpasst"
             continue
         vorher = _letzter(log, e["kanal"], e["id"])
         if vorher and vorher.get("status") in ERLEDIGT:
-            print(f"nichts: {e['id']} ist auf {e['kanal']} schon {vorher['status']}")
+            haengt = (vorher["status"] == "laeuft"
+                      and now - datetime.fromisoformat(vorher["zeit"]) > HAENGEND_NACH)
+            if echt and haengt:
+                _haengend_klaeren(e, vorher, log)
+            else:
+                print(f"nichts: {e['id']} ist auf {e['kanal']} schon {vorher['status']}")
             continue
         try:
             _pruefe_dateien(e)
@@ -218,3 +263,16 @@ def befehl(args) -> int:
     art = "gesendet" if echt else "im Trockenlauf gezeigt"
     print(f"ok: {gesendet if echt else 'alle fälligen'} Einträge {art}, {fehler} Fehler")
     return 1 if fehler else 0
+
+
+def befehl(args) -> int:
+    """Eigene Sperre, eigener Name: `tag` hält Sperre("lauf") und ruft diesen Befehl
+    trotzdem auf, ein zweiter manueller `posten`-Lauf nebenher darf sich aber nicht
+    mit einem laufenden `posten` überschneiden (sonst sehen beide denselben Plan und
+    dasselbe Protokoll noch ohne den anderen Eintrag und senden doppelt)."""
+    try:
+        with Sperre("posten"):
+            return _befehl(args)
+    except RuntimeError:
+        print("nichts: ein anderer Veröffentlichungslauf ist aktiv")
+        return 0

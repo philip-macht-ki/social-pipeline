@@ -104,6 +104,24 @@ def _antwort(r: requests.Response) -> dict:
     return daten | {"_http": r.status_code}
 
 
+def _plattform_ergebnis(antwort: dict, kanal: str) -> tuple[str | None, str | None]:
+    """Liest results[] aus der Antwort (Feld laut UploadStatusResponse in der API-Doku:
+    platform, success, message) für die eigene Plattform. Der äußere Status "completed"
+    zählt nur, wie viele Plattformen fertig sind, nicht ob sie geklappt haben — ein
+    "completed" mit success: false für die eigene Plattform ist trotzdem ein Fehlschlag.
+    Gibt (Fehlermeldung_oder_None, url_oder_None) zurück."""
+    ergebnisse = antwort.get("results") if isinstance(antwort.get("results"), list) else []
+    eigene = [x for x in ergebnisse if not kanal or x.get("platform") == kanal] or ergebnisse
+    fehlgeschlagen = [x for x in eigene if x.get("success") is False]
+    if fehlgeschlagen:
+        meldung = "; ".join(x.get("message", "") for x in fehlgeschlagen if x.get("message"))
+        return meldung or "Plattform meldet Fehlschlag.", None
+    url = None
+    for ergebnis in eigene:
+        url = url or ergebnis.get("post_url") or ergebnis.get("url")
+    return None, url
+
+
 def senden(e: dict) -> dict:
     """Sendet und gibt zurück: {"zustand": "ok"|"offen", "extern_id", "antwort"}.
     Wirft bei einem Fehler mit lesbarer Meldung."""
@@ -131,20 +149,31 @@ def senden(e: dict) -> dict:
     if r.status_code >= 400 or antwort.get("success") is False:
         raise RuntimeError(f"Upload-Post antwortet {r.status_code}: {str(antwort)[:300]}")
     kennung = antwort.get("request_id") or antwort.get("job_id")
-    return {"zustand": "offen" if kennung else "ok", "extern_id": kennung, "antwort": antwort}
+    if kennung:
+        return {"zustand": "offen", "extern_id": kennung, "antwort": antwort}
+    # Keine Kennung: die Antwort ist schon das Endergebnis. Enthält sie bereits
+    # Ergebnisse je Plattform, zählt das eigene, nicht der pauschale HTTP-Erfolg.
+    fehler, url = _plattform_ergebnis(antwort, e["kanal"])
+    if fehler:
+        raise RuntimeError(f"Upload-Post meldet Fehlschlag für {e['kanal']}: {fehler}")
+    return {"zustand": "ok", "antwort": antwort, "url": url}
 
 
-def nachfragen(kennung: str) -> dict:
-    """Stand eines laufenden Uploads. {"zustand": "ok"|"offen"|"fehler", "antwort", "url"}"""
+def nachfragen(kennung: str, kanal: str | None = None) -> dict:
+    """Stand eines laufenden Uploads. {"zustand": "ok"|"offen"|"fehler", "antwort", "url", "meldung"}"""
     feld = "job_id" if str(kennung).startswith("scheduler") else "request_id"
     r = requests.get(API + "/uploadposts/status", headers=_kopf(), params={feld: kennung}, timeout=60)
     antwort = _antwort(r)
+    status = str(antwort.get("status", "")).lower()
     text = str(antwort).lower()
     if r.status_code >= 400 or "failed" in text or "error" in text:
         return {"zustand": "fehler", "antwort": antwort}
-    if any(w in text for w in ("pending", "processing", "in_progress", "queued")):
+    laeuft_noch = any(w in text for w in ("pending", "processing", "in_progress", "queued"))
+    if status in ("pending", "in_progress") or laeuft_noch:
         return {"zustand": "offen", "antwort": antwort}
-    url = None
-    for ergebnis in antwort.get("results", []) if isinstance(antwort.get("results"), list) else []:
-        url = url or ergebnis.get("post_url") or ergebnis.get("url")
+    # status == "completed" ist nur die Gesamtzahl (Felder completed/total der
+    # UploadStatusResponse); ob GENAU DIESE Plattform ging, steht in results[].success.
+    fehler, url = _plattform_ergebnis(antwort, kanal)
+    if fehler:
+        return {"zustand": "fehler", "antwort": antwort, "meldung": fehler}
     return {"zustand": "ok", "antwort": antwort, "url": url}

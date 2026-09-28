@@ -240,7 +240,9 @@ def befehl_planen(args) -> int:
 
 
 def befehl_zeigen(args) -> int:
-    offen = [e for e in _plan().get("eintraege", []) if e.get("status") in ("geplant", "laeuft")]
+    # "pruefen" sind Einträge mit hängendem Senden (Absturz mitten im Lauf, siehe posten/__init__.py):
+    # ob der Beitrag online ist, muss von Hand auf der Plattform nachgesehen werden.
+    offen = [e for e in _plan().get("eintraege", []) if e.get("status") in ("geplant", "laeuft", "pruefen")]
     if not offen:
         print("nichts: Keine offenen Planeinträge.")
         return 0

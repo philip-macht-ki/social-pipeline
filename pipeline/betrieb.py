@@ -50,7 +50,9 @@ def befehl_status(args) -> int:
     plan = lesen(pfad("arbeit", "plan.json"), {"eintraege": []}).get("eintraege", [])
     bald = jetzt().date() + timedelta(days=2)
     for e in sorted(plan, key=lambda x: x.get("zeit", "")):
-        if datetime.fromisoformat(e["zeit"]).date() <= bald:
+        # "pruefen" (hängender Lauf, siehe posten/__init__.py) immer zeigen, auch wenn
+        # der ursprüngliche Sendeplatz schon länger als zwei Tage zurückliegt.
+        if e.get("status") == "pruefen" or datetime.fromisoformat(e["zeit"]).date() <= bald:
             print(f"{e['zeit']} {e['kanal']} {e['status']}")
     for x in lesen(pfad("arbeit", "postlog.json"), [])[-10:]:
         print(f"postlog: {x.get('kanal')} {x.get('plan_id')} {x.get('status')}")

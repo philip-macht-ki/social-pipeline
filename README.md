@@ -16,7 +16,7 @@ Oder selbst im Terminal:
 
 ```
 brew install ffmpeg uv
-uv sync --extra mac --extra dev
+uv sync --extra mac --extra dev --extra youtube
 uv run pipeline pruefen
 uv run pipeline beispiel
 uv run pipeline tag

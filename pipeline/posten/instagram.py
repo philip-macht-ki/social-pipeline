@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import os
 import time
+from datetime import timedelta
 from pathlib import Path
 
 import requests
 
-from ..kern import konfig, pfad
+from ..kern import jetzt, konfig, pfad, schreiben
 from .medien import bereitstellen
 
 # Instagram lässt höchstens 10 Kinder je Karussell zu (harte Grenze der API).
@@ -147,5 +148,12 @@ def befehl_token(args) -> int:
     if not any(z.startswith("INSTAGRAM_TOKEN=") for z in zeilen):
         zeilen.append(f"INSTAGRAM_TOKEN={neuer_token}")
     env.write_text("\n".join(zeilen) + "\n")
-    print(f"ok: Instagram-Token verlängert, gültig für {daten.get('expires_in', 'unbekannt')} Sekunden.")
+    # Nur das Ablaufdatum landet auf der Platte, nie der Token selbst (pruefen.py liest es).
+    try:
+        gueltig_s = int(daten.get("expires_in", 0))
+    except (TypeError, ValueError):
+        gueltig_s = 0
+    ablauf = jetzt() + timedelta(seconds=gueltig_s)
+    schreiben(pfad("arbeit", "instagram_token.json"), {"laeuft_ab": ablauf.isoformat()})
+    print(f"ok: Instagram-Token verlängert, gültig bis {ablauf:%d.%m.%Y}.")
     return 0

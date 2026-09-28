@@ -2,6 +2,7 @@ import argparse,json,sys,types
 from datetime import timedelta
 from pathlib import Path
 from pipeline import posten,kern
+from pipeline import plan as plan_modul
 from pipeline.posten import upload_post,instagram,youtube,medien
 
 def _eintrag(repo, kanal='threads', ident='p-0001', alt=1):
@@ -18,8 +19,21 @@ def test_doppelpost_schutz(repo):
  e=_eintrag(repo);(repo/'arbeit/plan.json').write_text(json.dumps({'eintraege':[e]}));(repo/'arbeit/postlog.json').write_text(json.dumps([{'kanal':'threads','plan_id':'p-0001','status':'ok'}]));posten.befehl(argparse.Namespace(echt=False,kanal=None));assert json.loads((repo/'arbeit/plan.json').read_text())['eintraege'][0]['status']=='geplant'
 
 def test_aelter_als_12_stunden_wird_verpasst(repo):
- # Überfällige Zeilen gehen nicht mehr raus, planen legt sie neu ein.
- e=_eintrag(repo,alt=13*60);(repo/'arbeit/plan.json').write_text(json.dumps({'eintraege':[e]}));posten.befehl(argparse.Namespace(echt=False,kanal=None));assert json.loads((repo/'arbeit/plan.json').read_text())['eintraege'][0]['status']=='verpasst'
+ # Überfällige Zeilen gehen nicht mehr raus, planen legt sie neu ein (nur echt, s.u.).
+ e=_eintrag(repo,alt=13*60);(repo/'arbeit/plan.json').write_text(json.dumps({'eintraege':[e]}));posten.befehl(argparse.Namespace(echt=True,kanal=None));assert json.loads((repo/'arbeit/plan.json').read_text())['eintraege'][0]['status']=='verpasst'
+
+
+def test_trockenlauf_laesst_ueberfaellige_zeile_im_plan_bytegleich(repo):
+    # Befund 28.09.2026: der Trockenlauf setzte ueberfaellige Zeilen auf "verpasst" und
+    # aenderte damit den Plan, obwohl ein Trockenlauf nur zeigen soll. Die Plan-Datei
+    # muss vor und nach einem Trockenlauf byte-fuer-byte gleich sein.
+    e = _eintrag(repo, alt=13 * 60)
+    plan_pfad = repo / 'arbeit/plan.json'
+    kern.schreiben(plan_pfad, {'eintraege': [e]})  # kanonisch formatiert, wie posten es selbst schreibt
+    vorher = plan_pfad.read_bytes()
+    posten.befehl(argparse.Namespace(echt=False, kanal=None))
+    assert plan_pfad.read_bytes() == vorher
+    assert json.loads(plan_pfad.read_text())['eintraege'][0]['status'] == 'geplant'
 
 
 def test_trockenlauf_aendert_plan_nicht_und_blockiert_echten_lauf_nicht(repo, monkeypatch):
@@ -53,10 +67,28 @@ def test_offener_upload_wird_nachgefragt_nicht_neu_gesendet(repo, monkeypatch):
     monkeypatch.setattr(posten.upload_post, 'senden', lambda x: {'zustand': 'offen', 'extern_id': 'req-1'})
     posten.befehl(argparse.Namespace(echt=True, kanal=None))
     monkeypatch.setattr(posten.upload_post, 'senden', lambda x: (_ for _ in ()).throw(AssertionError('doppelt')))
-    monkeypatch.setattr(posten.upload_post, 'nachfragen', lambda k: {'zustand': 'ok', 'url': 'https://x'})
+    monkeypatch.setattr(posten.upload_post, 'nachfragen', lambda k, kanal=None: {'zustand': 'ok', 'url': 'https://x'})
     posten.befehl(argparse.Namespace(echt=True, kanal=None))
     log = json.loads((repo / 'arbeit/postlog.json').read_text())
     assert log[-1]['status'] == 'ok' and log[-1]['extern_id'] == 'req-1'
+
+
+def test_offene_nachfrage_gibt_plattform_an_upload_post_weiter(repo, monkeypatch):
+    # Die Statusabfrage braucht die eigene Plattform, um results[] filtern zu koennen
+    # (Befund: "completed" ist nur die Gesamtzahl, nicht der eigene Erfolg).
+    e = _eintrag(repo, kanal='pinterest')
+    (repo / 'arbeit/plan.json').write_text(json.dumps({'eintraege': [e]}))
+    monkeypatch.setattr(posten.upload_post, 'senden', lambda x: {'zustand': 'offen', 'extern_id': 'req-9'})
+    posten.befehl(argparse.Namespace(echt=True, kanal=None))
+    gerufen = []
+
+    def nachfragen(kennung, kanal=None):
+        gerufen.append((kennung, kanal))
+        return {'zustand': 'ok', 'url': 'https://x'}
+
+    monkeypatch.setattr(posten.upload_post, 'nachfragen', nachfragen)
+    posten.befehl(argparse.Namespace(echt=True, kanal=None))
+    assert gerufen == [('req-9', 'pinterest')]
 
 def test_upload_post_anfragen_enthalten_plattformspezifische_felder(repo):
  basis={'art':'text','text':'Beschreibung','titel':'Titel','dateien':[]}
@@ -226,3 +258,131 @@ def test_instagram_karussell_hoechstens_zehn_kinder(repo, tmp_path, monkeypatch)
     instagram.senden({'art': 'karussell', 'dateien': dateien, 'text': 'x'})
     assert len(kind_aufrufe) == 10
     assert len(container_daten[0]['children'].split(',')) == 10
+
+
+class _Antwort:
+    def __init__(self, daten, status_code=200):
+        self._daten = daten
+        self.status_code = status_code
+
+    def json(self):
+        return self._daten
+
+
+def test_upload_post_nachfragen_erkennt_plattformspezifischen_fehlschlag(repo, monkeypatch):
+    monkeypatch.setenv('UPLOAD_POST_KEY', 'x')
+    # "completed" ist nur die Gesamtzahl (UploadStatusResponse.completed/total). Wenn
+    # results[] fuer die eigene Plattform success: false meldet, ist es trotzdem ein Fehler.
+    antwort = _Antwort({'status': 'completed', 'completed': 2, 'total': 2, 'results': [
+        {'platform': 'tiktok', 'success': True, 'message': ''},
+        {'platform': 'pinterest', 'success': False, 'message': 'board not found'},
+    ]})
+    monkeypatch.setattr(upload_post.requests, 'get', lambda *a, **kw: antwort)
+    stand = upload_post.nachfragen('req-1', 'pinterest')
+    assert stand['zustand'] == 'fehler' and 'board not found' in stand['meldung']
+
+
+def test_upload_post_nachfragen_ok_wenn_eigene_plattform_erfolgreich(repo, monkeypatch):
+    monkeypatch.setenv('UPLOAD_POST_KEY', 'x')
+    antwort = _Antwort({'status': 'completed', 'completed': 2, 'total': 2, 'results': [
+        {'platform': 'tiktok', 'success': False, 'message': 'nope'},
+        {'platform': 'pinterest', 'success': True, 'post_url': 'https://pin/1'},
+    ]})
+    monkeypatch.setattr(upload_post.requests, 'get', lambda *a, **kw: antwort)
+    stand = upload_post.nachfragen('req-1', 'pinterest')
+    assert stand['zustand'] == 'ok' and stand['url'] == 'https://pin/1'
+
+
+def test_upload_post_senden_prueft_eigene_plattform_bei_direkter_antwort(repo, monkeypatch, tmp_path):
+    # Auch ohne request_id/job_id (synchrone Antwort) zaehlt das eigene Ergebnis, nicht
+    # der pauschale HTTP-Erfolg.
+    monkeypatch.setenv('UPLOAD_POST_KEY', 'x')
+    datei = tmp_path / 'x.jpg'
+    datei.write_bytes(b'x')
+    antwort = _Antwort({'success': True, 'results': [
+        {'platform': 'threads', 'success': False, 'message': 'rate limited'},
+    ]})
+    monkeypatch.setattr(upload_post.requests, 'post', lambda *a, **kw: antwort)
+    try:
+        upload_post.senden({'kanal': 'threads', 'art': 'bild', 'text': 'x', 'dateien': [str(datei)]})
+    except RuntimeError as x:
+        assert 'rate limited' in str(x)
+    else:
+        raise AssertionError('haette scheitern muessen')
+
+
+def test_haengender_laeuft_eintrag_wird_zur_pruefung_markiert_nicht_neu_gesendet(repo, monkeypatch):
+    # Absturz-Simulation: ein "laeuft"-Eintrag ohne Nachfolger, aelter als 30 Minuten.
+    e = _eintrag(repo, kanal='threads')
+    (repo / 'arbeit/plan.json').write_text(json.dumps({'eintraege': [e]}))
+    alt = (kern.jetzt() - timedelta(minutes=45)).isoformat(timespec='seconds')
+    (repo / 'arbeit/postlog.json').write_text(json.dumps(
+        [{'kanal': 'threads', 'plan_id': 'p-0001', 'status': 'laeuft', 'trocken': False,
+          'zeit': alt, 'weg': 'upload_post'}]))
+    monkeypatch.setattr(posten.upload_post, 'senden',
+                         lambda x: (_ for _ in ()).throw(AssertionError('haette nicht senden duerfen')))
+    posten.befehl(argparse.Namespace(echt=True, kanal=None))
+    plan = json.loads((repo / 'arbeit/plan.json').read_text())['eintraege'][0]
+    assert plan['status'] == 'pruefen'
+    assert plan['befunde'] and 'unterbrochen' in plan['befunde'][-1]
+    log = json.loads((repo / 'arbeit/postlog.json').read_text())
+    assert log[-1]['status'] == 'unklar'
+
+
+def test_haengender_laeuft_trockenlauf_aendert_nichts(repo):
+    e = _eintrag(repo, kanal='threads')
+    plan_pfad = repo / 'arbeit/plan.json'
+    kern.schreiben(plan_pfad, {'eintraege': [e]})  # kanonisch formatiert
+    alt = (kern.jetzt() - timedelta(minutes=45)).isoformat(timespec='seconds')
+    (repo / 'arbeit/postlog.json').write_text(json.dumps(
+        [{'kanal': 'threads', 'plan_id': 'p-0001', 'status': 'laeuft', 'trocken': False,
+          'zeit': alt, 'weg': 'upload_post'}]))
+    vorher = plan_pfad.read_bytes()
+    posten.befehl(argparse.Namespace(echt=False, kanal=None))
+    assert plan_pfad.read_bytes() == vorher
+
+
+def test_haengender_laeuft_frisch_wird_nicht_angefasst(repo, monkeypatch):
+    # Unter 30 Minuten alt: noch als "unterwegs" behandeln, nicht als abgestuerzt.
+    e = _eintrag(repo, kanal='threads')
+    (repo / 'arbeit/plan.json').write_text(json.dumps({'eintraege': [e]}))
+    frisch = (kern.jetzt() - timedelta(minutes=5)).isoformat(timespec='seconds')
+    (repo / 'arbeit/postlog.json').write_text(json.dumps(
+        [{'kanal': 'threads', 'plan_id': 'p-0001', 'status': 'laeuft', 'trocken': False,
+          'zeit': frisch, 'weg': 'upload_post'}]))
+    monkeypatch.setattr(posten.upload_post, 'senden',
+                         lambda x: (_ for _ in ()).throw(AssertionError('haette nicht senden duerfen')))
+    posten.befehl(argparse.Namespace(echt=True, kanal=None))
+    plan = json.loads((repo / 'arbeit/plan.json').read_text())['eintraege'][0]
+    assert plan['status'] == 'geplant' and 'befunde' not in plan
+
+
+def test_haengender_laeuft_mit_bekannter_kennung_wird_bei_upload_post_nachgefragt(repo, monkeypatch):
+    # Kam die Antwort doch noch an, bevor der Prozess starb, ist die Kennung im
+    # "laeuft"-Eintrag bekannt: dann nachfragen statt zur Pruefung markieren.
+    e = _eintrag(repo, kanal='threads')
+    (repo / 'arbeit/plan.json').write_text(json.dumps({'eintraege': [e]}))
+    alt = (kern.jetzt() - timedelta(minutes=45)).isoformat(timespec='seconds')
+    (repo / 'arbeit/postlog.json').write_text(json.dumps(
+        [{'kanal': 'threads', 'plan_id': 'p-0001', 'status': 'laeuft', 'trocken': False,
+          'zeit': alt, 'weg': 'upload_post', 'extern_id': 'req-alt'}]))
+    monkeypatch.setattr(posten.upload_post, 'nachfragen',
+                         lambda k, kanal=None: {'zustand': 'ok', 'url': 'https://x'})
+    posten.befehl(argparse.Namespace(echt=True, kanal=None))
+    plan = json.loads((repo / 'arbeit/plan.json').read_text())['eintraege'][0]
+    assert plan['status'] == 'veroeffentlicht'
+    log = json.loads((repo / 'arbeit/postlog.json').read_text())
+    assert log[-1]['status'] == 'ok' and log[-1]['extern_id'] == 'req-alt'
+
+
+def test_pruefen_zeigt_haengende_eintraege(repo):
+    daten = {'eintraege': [{
+        'id': 'p-0001', 'kanal': 'threads', 'art': 'bild', 'zeit': kern.jetzt().isoformat(),
+        'status': 'pruefen', 'freigegeben': True, 'dateien': [], 'text': 'x',
+    }]}
+    (repo / 'arbeit/plan.json').write_text(json.dumps(daten))
+    import io, contextlib
+    ausgabe = io.StringIO()
+    with contextlib.redirect_stdout(ausgabe):
+        plan_modul.befehl_zeigen(argparse.Namespace())
+    assert 'p-0001' in ausgabe.getvalue()
