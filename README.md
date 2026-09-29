@@ -53,6 +53,7 @@ nur, was freigegeben ist.
 | Ansehen und freigeben | `pipeline zeigen`, `pipeline freigeben` | du |
 | Veröffentlichen | `pipeline posten --echt` | Code |
 | Lücken melden | `pipeline vorrat`, `pipeline status` | Code |
+| Verbrauch ansehen | `pipeline verbrauch` | Code |
 | Alles in einem Lauf | `pipeline tag` | |
 | Automatisch alle 20 Minuten | `pipeline zeitplan einrichten` | |
 
@@ -86,6 +87,26 @@ privat ein. Deshalb gibt es diesen Weg hier noch nicht.
 Mac mit Apple-Chip, 16 GB Arbeitsspeicher, rund 30 GB frei. Claude Code mit
 Pro-Abo oder höher (die inhaltlichen Entscheidungen laufen über `claude -p`).
 ffmpeg und uv über Homebrew.
+
+### Welches Abo reicht
+
+Jedes Urteil ruft `claude -p` schlank auf: ohne Werkzeuge, ohne MCP-Server,
+ohne CLAUDE.md. Das sind rund 5.000 Tokens statt rund 60.000 (gemessen am
+29.09.2026). Eine Aufnahme mit vier Stücken braucht damit etwa 100.000 Tokens.
+Das Transkript rechnet Whisper lokal: kostet nichts und die Aufnahme bleibt
+auf deinem Mac.
+
+| Wie du arbeitest | Abo |
+|---|---|
+| Eine Aufnahme am Tag, Einrichtung über ein paar Abende verteilt | Claude Pro, 20 € im Monat |
+| Zwei bis drei Aufnahmen am Tag, oder Einrichtung an einem Wochenende, oder Claude auch sonst täglich im Einsatz | Claude Max 5x, rund 100 € im Monat |
+| Mehrere Marken, Claude den ganzen Tag im Dauerbetrieb | Claude Max 20x, rund 200 € im Monat |
+| Du stößt an die Grenze und willst nicht hochstufen | ChatGPT Plus mit Codex dazu, rund 23 € im Monat, `backend = "codex"` in `konfig/pipeline.toml` |
+
+Anthropic veröffentlicht keine festen Token-Zahlen je Abo; die Tabelle ist ein
+Richtwert. `uv run pipeline verbrauch` zeigt, was die Pipeline je Tag wirklich
+gebraucht hat, und in der Claude-App steht unter Einstellungen, Nutzung, wie
+viel vom Fenster übrig ist.
 
 ## Lizenz
 

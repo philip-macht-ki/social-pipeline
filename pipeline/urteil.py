@@ -76,11 +76,22 @@ def json_aus(text: str):
     raise KeinUrteil("Die Antwort enthielt kein lesbares JSON.")
 
 
+# Ein Urteil braucht keine Werkzeuge, keine MCP-Server und keine CLAUDE.md.
+# Ohne diese Schalter lädt `claude -p` all das mit, rund 60.000 Tokens je
+# Aufruf bei einem Auftrag von wenigen hundert. Mit ihnen sind es rund 5.000
+# (gemessen am 29.09.2026), das Abo-Kontingent reicht also gut zehnmal länger.
+SCHLANK = ["--tools", "", "--strict-mcp-config", "--setting-sources", "",
+           "--system-prompt", "Du bist ein genauer Redakteur. Antworte nur mit dem verlangten JSON."]
+
+# Verbrauch des letzten Aufrufs, fürs Protokoll (nur das claude-Backend meldet ihn).
+_verbrauch: dict = {}
+
+
 def _claude(auftrag: str, modell: str) -> str:
     if not shutil.which("claude"):
         raise KeinUrteil("Der Befehl `claude` fehlt. Claude Code installieren (Werkstatt W0).")
     r = subprocess.run(
-        ["claude", "-p", "--output-format", "json", "--model", modell],
+        ["claude", "-p", "--output-format", "json", "--model", modell, *SCHLANK],
         input=auftrag, capture_output=True, text=True, timeout=600,
     )
     if r.returncode != 0:
@@ -91,6 +102,9 @@ def _claude(auftrag: str, modell: str) -> str:
         return r.stdout
     if daten.get("is_error"):
         raise KeinUrteil(f"claude -p meldet einen Fehler: {str(daten.get('result'))[:300]}")
+    u = daten.get("usage") or {}
+    _verbrauch["tokens"] = sum(int(u.get(k) or 0) for k in (
+        "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"))
     return str(daten.get("result", ""))
 
 
@@ -173,6 +187,7 @@ def frage(
     for versuch in (1, 2):
         start = time.time()
         roh = ""
+        _verbrauch.clear()
         try:
             roh = BACKENDS[backend](text, modell)
             antwort = json_aus(roh)
@@ -182,6 +197,7 @@ def frage(
         _protokoll({"zeit": jetzt().isoformat(timespec="seconds"), "zweck": zweck,
                     "backend": backend, "modell": modell, "versuch": versuch,
                     "sekunden": round(time.time() - start, 1), "mangel": mangel,
+                    "tokens": _verbrauch.get("tokens"),
                     "auftrag": auftrag[:4000], "antwort": roh[:4000]})
         if mangel is None and antwort is not None:
             schreiben(cache, {"zeit": time.time(), "antwort": antwort})
@@ -192,3 +208,33 @@ def frage(
     if rueckfall is not None:
         return rueckfall()
     raise KeinUrteil(f"{zweck}: kein brauchbares Urteil ({letzter_mangel})")
+
+
+def befehl_verbrauch(args) -> int:
+    """Wie viele Modellurteile und Tokens die letzten Tage gekostet haben."""
+    from datetime import timedelta
+    tage = args.tage or 7
+    grenze = jetzt() - timedelta(days=tage)
+    ziel = pfad("arbeit", "urteile.jsonl")
+    je_tag: dict[str, list[int]] = {}
+    if ziel.exists():
+        from datetime import datetime
+        for zeile in ziel.read_text(encoding="utf-8").splitlines():
+            try:
+                e = json.loads(zeile)
+                zeit = datetime.fromisoformat(e["zeit"])
+            except (ValueError, KeyError):
+                continue
+            if zeit < grenze:
+                continue
+            tag = je_tag.setdefault(zeit.strftime("%d.%m.%Y"), [0, 0])
+            tag[0] += 1
+            tag[1] += int(e.get("tokens") or 0)
+    if not je_tag:
+        print(f"In den letzten {tage} Tagen keine Modellurteile.")
+        return 0
+    for tag, (anzahl, tokens) in je_tag.items():
+        menge = f"rund {tokens:,} Tokens".replace(",", ".") if tokens else "Tokens nicht gemessen"
+        print(f"{tag}: {anzahl:3d} Urteile, {menge}")
+    print("Gezählt wird nur, was über `claude -p` lief. Aus dem Zwischenspeicher kostet nichts.")
+    return 0

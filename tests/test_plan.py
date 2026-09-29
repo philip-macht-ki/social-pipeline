@@ -25,7 +25,9 @@ def test_nachtruhe_slot_wird_nicht_geplant(repo):
 def test_vorziehen_zieht_spaeteren_eintrag_in_luecke(repo):
     _cfg(repo, '''[instagram]\nan=true\nweg="upload_post"\nslots=[{zeit="10:00",art="reel"}]\ntagesdeckel=9\nmindestabstand_minuten=0\nnachtruhe=["00:00","00:00"]\n''')
     morgen=kern.jetzt().replace(hour=10,minute=0,second=0,microsecond=0)+timedelta(days=1); uebermorgen=morgen+timedelta(days=1); eintrag={**_k(),'id':'p-0001','zeit':uebermorgen.isoformat(),'slot':1,'status':'geplant','freigegeben':False};(repo/'arbeit/plan.json').write_text(json.dumps({'eintraege':[eintrag]}))
-    assert plan.vorziehen(argparse.Namespace(tage=3)) == 1;assert plan._dt(json.loads((repo/'arbeit/plan.json').read_text())['eintraege'][0]['zeit']) == morgen
+    # Vor 10 Uhr ist schon der heutige Platz frei (Test lief am 29.09.2026 um 08:51 rot).
+    heute=morgen-timedelta(days=1); erster=heute if heute>kern.jetzt() else morgen
+    assert plan.vorziehen(argparse.Namespace(tage=3)) == 1;assert plan._dt(json.loads((repo/'arbeit/plan.json').read_text())['eintraege'][0]['zeit']) == erster
 
 def test_tagesdeckel_wird_eingehalten(repo):
     cfg={'tagesdeckel':1,'mindestabstand_minuten':0,'nachtruhe':['00:00','00:00']};z=plan._dt(_zeit(60));assert not plan._erlaubt(_k(),z,[_e(_k(take='alt'),z-timedelta(minutes=1))],cfg)

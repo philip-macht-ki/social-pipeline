@@ -29,6 +29,7 @@ BEFEHLE: dict[str, tuple[str, str, str]] = {
     "posten": ("posten", "befehl", "Fällige, freigegebene Einträge veröffentlichen (trocken ohne --echt)"),
     "vorrat": ("betrieb", "befehl_vorrat", "Geplant gegen Soll, Lücken melden"),
     "status": ("betrieb", "befehl_status", "Kurzübersicht über alles"),
+    "verbrauch": ("urteil", "befehl_verbrauch", "Modellurteile und Tokens je Tag (Standard: 7 Tage)"),
     "tag": ("tageslauf", "befehl", "Der ganze Lauf in fester Reihenfolge"),
     "zeitplan": ("betrieb", "befehl_zeitplan", "launchd-Job einrichten oder entfernen"),
     "instagram-token": ("posten.instagram", "befehl_token", "Instagram-Token verlängern"),
