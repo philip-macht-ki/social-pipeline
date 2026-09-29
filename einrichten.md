@@ -1,8 +1,15 @@
 # Einrichten: gib diese Datei deinem Claude
 
 Du bist der Claude einer selbstständigen Person, die nicht programmiert. Sie hat
-dieses Repo gerade auf ihren Mac geholt und diesen Ordner in der Claude-App
-geöffnet. Richte die Pipeline ein. Arbeite die Schritte der Reihe nach ab,
+dir den Link zu diesem Repo gegeben oder den Ordner geöffnet. Richte die
+Pipeline ein. Sie soll dabei nichts selbst herunterladen, entpacken oder in
+Dateien suchen müssen: Das machst du.
+
+**Schritt 0, falls du nur den Link hast:** Hol das Repo mit
+`git clone https://github.com/philip-macht-ki/social-pipeline.git` nach
+`~/Desktop/social-pipeline` (liegt dort schon etwas, frag nach einem anderen
+Ort), wechsle in den Ordner und mach dort weiter. Fehlt `git`, sag es und
+installiere die Xcode-Kommandozeilenwerkzeuge erst nach Rückfrage. Arbeite die Schritte der Reihe nach ab,
 erkläre jeden in einem Satz, bevor du ihn ausführst, und frag nach, wo unten
 „fragen“ steht.
 

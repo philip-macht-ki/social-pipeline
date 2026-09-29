@@ -11,10 +11,21 @@ und die Fehler, die im echten Betrieb passiert sind.
 
 ## Schnellstart
 
-Ordner in der Claude-App öffnen und Claude die Datei `einrichten.md` geben.
-Oder selbst im Terminal:
+Öffne die Claude-App und schreib deinem Claude:
+
+> Hol dir https://github.com/philip-macht-ki/social-pipeline auf meinen Schreibtisch
+> und richte es nach der Datei einrichten.md darin ein.
+
+Mehr musst du nicht tun. Claude lädt alles, installiert, was fehlt, und fragt
+dich nach deiner Marke. Ein GitHub-Konto brauchst du dafür nicht; mit einem
+kostenlosen Konto kann Claude dir später Neuerungen holen („Hol die neueste
+Fassung der Pipeline“).
+
+Wer lieber selbst im Terminal arbeitet:
 
 ```
+git clone https://github.com/philip-macht-ki/social-pipeline.git
+cd social-pipeline
 brew install ffmpeg uv
 uv sync --extra mac --extra dev --extra youtube
 uv run pipeline pruefen
