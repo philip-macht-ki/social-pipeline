@@ -101,7 +101,7 @@ auf deinem Mac.
 | Eine Aufnahme am Tag, Einrichtung über ein paar Abende verteilt | Claude Pro, 20 € im Monat |
 | Zwei bis drei Aufnahmen am Tag, oder Einrichtung an einem Wochenende, oder Claude auch sonst täglich im Einsatz | Claude Max 5x, rund 100 € im Monat |
 | Mehrere Marken, Claude den ganzen Tag im Dauerbetrieb | Claude Max 20x, rund 200 € im Monat |
-| Du stößt an die Grenze und willst nicht hochstufen | ChatGPT Plus mit Codex dazu, rund 23 € im Monat, `backend = "codex"` in `konfig/pipeline.toml` |
+| Du stößt an die Grenze und willst nicht hochstufen | ChatGPT Plus mit Codex dazu, rund 23 € im Monat, `backend = "codex"` unter `[urteil]` in `konfig/pipeline.toml` (oder einmalig `URTEIL_BACKEND=codex`) |
 
 Anthropic veröffentlicht keine festen Token-Zahlen je Abo; die Tabelle ist ein
 Richtwert. `uv run pipeline verbrauch` zeigt, was die Pipeline je Tag wirklich
