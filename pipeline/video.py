@@ -402,7 +402,12 @@ def fassungen_stueck(stueck_id: str, *, neu: bool = False) -> Ergebnis:
     if not roh.exists() or not achse:
         return Ergebnis("fehler", "roh.mp4/zeitachse.json fehlen, erst 'bauen' laufen lassen.")
     ziel_dateien = [ordner / n for n in ("instagram.mp4", "tiktok.mp4", "cover.jpg")]
-    if all(p.exists() for p in ziel_dateien) and not neu:
+    # Vorhandene Fassungen zählen nur, wenn sie jünger sind als roh.mp4 und
+    # zeitachse.json. Sonst ginge nach einem Neubau von roh.mp4 die alte,
+    # falsch untertitelte Fassung raus (so passiert bei Y39 im Betrieb).
+    quelle_stand = max(roh.stat().st_mtime_ns, (ordner / "zeitachse.json").stat().st_mtime_ns)
+    aktuell = all(p.exists() and p.stat().st_mtime_ns >= quelle_stand for p in ziel_dateien)
+    if aktuell and not neu:
         return Ergebnis("nichts", "Fassungen vorhanden, --neu erzwingt Neubau.")
 
     rezept_pfad = _rezept_pfad(stueck_id)

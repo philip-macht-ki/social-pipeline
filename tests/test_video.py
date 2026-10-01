@@ -229,6 +229,23 @@ def test_ziel_stuecke_loest_take_namen_auf(repo):
     assert set(video._ziel_stuecke(args)) == {"beispiel-01", "beispiel-02"}
 
 
+def test_fassungen_veraltet_nach_neuem_rohschnitt(repo):
+    """Neuer roh.mp4 nach den Fassungen: die alten zählen nicht mehr als fertig."""
+    import os
+    ordner = repo / "ausgabe" / "x-01"
+    ordner.mkdir(parents=True)
+    for n in ("roh.mp4", "instagram.mp4", "tiktok.mp4", "cover.jpg"):
+        (ordner / n).write_bytes(b"x")
+    (ordner / "zeitachse.json").write_text('{"dauer_s": 1}', encoding="utf-8")
+    for n in ("instagram.mp4", "tiktok.mp4", "cover.jpg"):
+        os.utime(ordner / n, ns=(2_000_000_000_000_000_000,) * 2)
+    for n in ("roh.mp4", "zeitachse.json"):
+        os.utime(ordner / n, ns=(1_000_000_000_000_000_000,) * 2)
+    assert video.fassungen_stueck("x-01").status == "nichts"
+    os.utime(ordner / "roh.mp4", ns=(3_000_000_000_000_000_000,) * 2)
+    assert video.fassungen_stueck("x-01").status != "nichts"
+
+
 # ------------------------------------------------------------ Ende-zu-Ende --
 
 @pytest.mark.langsam
