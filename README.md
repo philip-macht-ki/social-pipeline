@@ -108,6 +108,15 @@ Richtwert. `uv run pipeline verbrauch` zeigt, was die Pipeline je Tag wirklich
 gebraucht hat, und in der Claude-App steht unter Einstellungen, Nutzung, wie
 viel vom Fenster übrig ist.
 
+## KI-Video umbauen und erzeugen
+
+Der Ordner `umbau/` baut aus einer eigenen Handyaufnahme per KI ein neues
+Video: Gegenstand, Fensterblick oder Outfit ändern sich, Gesicht und Stimme
+bleiben echt. Dasselbe Werkzeug kann auch Clips ganz ohne Kamera erzeugen,
+aus einem gemalten Storyboard. Beides erklärt `umbau/README.md`, dazu Kosten
+in Euro je Sekunde, Modellwahl und die Fallen aus dem echten Betrieb. Im Kurs
+ist das Modul S7 „KI-Video: umbauen und erzeugen".
+
 ## Lizenz
 
 Code: MIT, siehe `LICENSE`. Schriften in `schriften/`: SIL Open Font License,
