@@ -27,3 +27,22 @@ def test_hook_schwellen():
     assert hook.vorziehen(7,5)
     assert hook.vorziehen(6,2)
     assert not hook.vorziehen(6,4)
+
+
+def test_satzzeichen_trotz_zusammengezogenem_wort():
+    block = [{"w": x, "s": 0, "e": 0} for x in "ich habe die e mail strecke überarbeitet also egal was du machst".split()]
+    neue = "Ich habe die E-Mail-Strecke überarbeitet. Also egal, was du machst.".split()
+    assert transkript.zeichen_uebernehmen(block, neue) == 3
+    assert [w["w"] for w in block][3:9] == ["e", "mail", "strecke", "überarbeitet.", "also", "egal,"]
+
+
+def test_satzzeichen_verworfen_wenn_modell_umschreibt():
+    block = [{"w": x, "s": 0, "e": 0} for x in "das ist ein ganz anderer satz".split()]
+    assert transkript.zeichen_uebernehmen(block, "Völlig neuer Text hier.".split()) == 0
+    assert all("." not in w["w"] for w in block)
+
+
+def test_fenster_schneiden_in_der_laengsten_pause():
+    w = [{"w": "a", "s": i, "e": i + .8} for i in range(40)]
+    w[15]["e"] = 15.2   # längste Pause zwischen 15,2 und 16,0
+    assert round(transkript.schnitte(w, 40.0)[0], 2) == 15.6

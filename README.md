@@ -94,7 +94,10 @@ Jedes Urteil ruft `claude -p` schlank auf: ohne Werkzeuge, ohne MCP-Server,
 ohne CLAUDE.md. Das sind rund 5.000 Tokens statt rund 60.000 (gemessen am
 29.09.2026). Eine Aufnahme mit vier Stücken braucht damit etwa 100.000 Tokens.
 Das Transkript rechnet Whisper lokal: kostet nichts und die Aufnahme bleibt
-auf deinem Mac.
+auf deinem Mac. Es hört in Fenstern von 12 bis 22 Sekunden, geschnitten in
+Sprechpausen, weil Whisper am Stück nach einer Weile Satzzeichen verliert und
+sich öfter verhört. Den Satz `prompt` unter `[transkript]` in
+`konfig/pipeline.toml` passt du an deine Wörter an (Namen, Werkzeuge).
 
 | Wie du arbeitest | Abo |
 |---|---|

@@ -5,6 +5,12 @@ modell = "sonnet"
 [transkript]
 backend = "mlx"
 modell = "mlx-community/whisper-large-v3-turbo"
+# In Fenstern von 12 bis 22 s hören statt am Stück: mehr Satzzeichen, weniger
+# Verhörer. false schaltet zurück auf einen Lauf über die ganze Aufnahme.
+fenster = true
+# Ein Satz mit Satzzeichen und den Wörtern, die in deinen Aufnahmen oft
+# vorkommen (Namen, Werkzeuge). Er hilft Whisper bei Schreibweise und Punkten.
+prompt = "Heute geht es um KI, Claude Code und Automatisierung."
 
 sprache = "de"
 zeitzone = "Europe/Berlin"
