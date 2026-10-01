@@ -1,34 +1,27 @@
 """Tests für die Werkzeuge in umbau/, ohne Netzzugriff und ohne echtes ffmpeg
-oder rclone. Die Module liegen bewusst außerhalb des pipeline-Pakets (eigene
-Vorlage, keine zusätzliche Abhängigkeit), deshalb werden sie hier per Pfad
-geladen statt importiert.
+oder rclone. umbau/ liegt bewusst außerhalb des pipeline-Pakets (eigene
+Vorlage, keine zusätzliche Abhängigkeit); die Module importieren sich
+gegenseitig per bare import, genau wie beim echten Aufruf als Skript
+(`python3 umbau/umbauen.py …` setzt umbau/ automatisch vor in sys.path).
+Darum bilden wir das hier nach, statt die Dateien einzeln per Pfad zu laden.
 """
 from __future__ import annotations
 
-import importlib.util
 import sys
-import types
 from pathlib import Path
 
 import pytest
 
 UMBAU = Path(__file__).resolve().parents[1] / "umbau"
+if str(UMBAU) not in sys.path:
+    sys.path.insert(0, str(UMBAU))
 
-
-def _laden(name: str) -> types.ModuleType:
-    spec = importlib.util.spec_from_file_location(f"umbau_{name}", UMBAU / f"{name}.py")
-    modul = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    sys.modules[spec.name] = modul
-    spec.loader.exec_module(modul)
-    return modul
-
-
-hochladen = _laden("hochladen")
-abschnitte_mod = _laden("abschnitte")
-einsetzen_mod = _laden("einsetzen")
-openrouter_mod = _laden("openrouter")
-musik_mod = _laden("musik")
+import abschnitte as abschnitte_mod  # noqa: E402
+import einsetzen as einsetzen_mod  # noqa: E402
+import hochladen  # noqa: E402
+import musik as musik_mod  # noqa: E402
+import openrouter as openrouter_mod  # noqa: E402
+import storyboard_video  # noqa: E402
 
 
 # --- hochladen.py: Drive-Link-Umbau ---------------------------------------
@@ -86,6 +79,72 @@ def test_kurzlebiger_link_laedt_hoch_und_loescht_immer(monkeypatch, tmp_path):
             raise ValueError("Fehler mitten im Auftrag")
 
     assert aufgerufen == [("hoch", str(datei)), ("weg", "datei.mp4")]
+
+
+# --- hochladen.py: weg() prüft Rückgabecode und kontrolliert mit rclone lsf
+
+
+class _FakeErgebnis:
+    def __init__(self, returncode=0, stdout=""):
+        self.returncode = returncode
+        self.stdout = stdout
+
+
+def test_weg_ohne_warnung_wenn_loeschen_klappt_und_datei_weg_ist(monkeypatch, capsys):
+    rufe = []
+
+    def fake_run(cmd, **kwargs):
+        rufe.append(cmd)
+        if cmd[1] == "deletefile":
+            return _FakeErgebnis(returncode=0)
+        if cmd[1] == "lsf":
+            return _FakeErgebnis(returncode=0, stdout="andere-datei.mp4\n")
+        raise AssertionError(f"unerwarteter Aufruf: {cmd}")
+
+    monkeypatch.setattr(hochladen.subprocess, "run", fake_run)
+    hochladen.weg("datei.mp4", remote="gdrive:umbau-tmp")
+    fehler = capsys.readouterr().err
+    assert "WARNUNG" not in fehler
+    # beide Schritte wurden tatsächlich ausgeführt: löschen UND kontrollieren
+    befehle = [cmd[1] for cmd in rufe]
+    assert "deletefile" in befehle and "lsf" in befehle
+
+
+def test_weg_warnt_wenn_loeschen_fehlschlaegt(monkeypatch, capsys):
+    def fake_run(cmd, **kwargs):
+        if cmd[1] == "deletefile":
+            return _FakeErgebnis(returncode=1, stdout="")
+        raise AssertionError("lsf sollte nach einem fehlgeschlagenen Löschen nicht mehr nötig sein")
+
+    monkeypatch.setattr(hochladen.subprocess, "run", fake_run)
+    hochladen.weg("datei.mp4", remote="gdrive:umbau-tmp")
+    fehler = capsys.readouterr().err
+    assert "WARNUNG" in fehler
+    assert "rclone deletefile --drive-use-trash=false gdrive:umbau-tmp/datei.mp4" in fehler
+
+
+def test_weg_warnt_wenn_datei_nach_dem_loeschen_noch_da_ist(monkeypatch, capsys):
+    def fake_run(cmd, **kwargs):
+        if cmd[1] == "deletefile":
+            return _FakeErgebnis(returncode=0)
+        if cmd[1] == "lsf":
+            return _FakeErgebnis(returncode=0, stdout="datei.mp4\n")
+        raise AssertionError(f"unerwarteter Aufruf: {cmd}")
+
+    monkeypatch.setattr(hochladen.subprocess, "run", fake_run)
+    hochladen.weg("datei.mp4", remote="gdrive:umbau-tmp")
+    fehler = capsys.readouterr().err
+    assert "WARNUNG" in fehler
+    assert "rclone deletefile --drive-use-trash=false gdrive:umbau-tmp/datei.mp4" in fehler
+
+
+def test_ist_noch_da_true_false(monkeypatch):
+    monkeypatch.setattr(
+        hochladen.subprocess, "run",
+        lambda cmd, **k: _FakeErgebnis(stdout="a.mp4\nb.mp4\n"),
+    )
+    assert hochladen.ist_noch_da("gdrive:umbau-tmp", "a.mp4") is True
+    assert hochladen.ist_noch_da("gdrive:umbau-tmp", "c.mp4") is False
 
 
 # --- abschnitte.py: abschnitte.json-Prüfung -------------------------------
@@ -178,6 +237,103 @@ def test_quelle_waehlen_faellt_zurueck_ohne_geschaerfte_datei(tmp_path):
     (tmp_path / "edit-a.mp4").write_bytes(b"x")
     assert einsetzen_mod.quelle_waehlen(str(tmp_path), "a").endswith("edit-a.mp4")
     assert "scharf" not in einsetzen_mod.quelle_waehlen(str(tmp_path), "a")
+
+
+# --- einsetzen.py: --feld ist Pflicht, kein stilles Raten -----------------
+
+
+def test_feld_erzwingen_gibt_wert_zurueck_wenn_vorhanden():
+    assert einsetzen_mod.feld_erzwingen("200:180:860:60") == "200:180:860:60"
+
+
+def test_feld_erzwingen_bricht_ohne_feld_klar_ab():
+    with pytest.raises(ValueError) as err:
+        einsetzen_mod.feld_erzwingen(None)
+    text = str(err.value)
+    assert "--feld" in text
+    assert "Claude" in text
+
+
+def test_feld_erzwingen_bricht_bei_leerem_feld_ab():
+    with pytest.raises(ValueError):
+        einsetzen_mod.feld_erzwingen("")
+
+
+# --- storyboard_video.py: -fast-Modell nimmt automatisch 4s/720x1280 -----
+
+
+def test_ist_fast_modell():
+    assert storyboard_video.ist_fast_modell("bytedance/seedance-2.0-fast")
+    assert not storyboard_video.ist_fast_modell("bytedance/seedance-2.0")
+
+
+def test_standardwerte_fuer_fast_modell():
+    dauer, size = storyboard_video.standardwerte("bytedance/seedance-2.0-fast")
+    assert dauer == 4
+    assert size == "720x1280"
+
+
+def test_standardwerte_fuer_normales_modell():
+    dauer, size = storyboard_video.standardwerte("bytedance/seedance-2.0")
+    assert dauer == 10
+    assert size == "1080x1920"
+
+
+def test_erzeugen_setzt_fast_werte_automatisch(monkeypatch, tmp_path):
+    aufgezeichnet = {}
+
+    @__import__("contextlib").contextmanager
+    def fake_link(pfad, remote=None):
+        yield "https://beispiel.invalid/bild.png"
+
+    def fake_req(method, path, body=None):
+        aufgezeichnet["body"] = body
+        return 200, b'{"id": "abc"}'
+
+    def fake_warten(auftrag_id, intervall=10, timeout=1800):
+        return {"usage": 0.37}
+
+    def fake_laden(auftrag_id, ziel, index=0):
+        pass
+
+    monkeypatch.setattr(storyboard_video, "kurzlebiger_link", fake_link)
+    monkeypatch.setattr(storyboard_video.orv, "req", fake_req)
+    monkeypatch.setattr(storyboard_video.orv, "warten", fake_warten)
+    monkeypatch.setattr(storyboard_video.orv, "laden", fake_laden)
+
+    bild = tmp_path / "storyboard.png"
+    bild.write_bytes(b"x")
+    storyboard_video.erzeugen(str(bild), str(tmp_path / "ziel.mp4"), "prompt", modell="bytedance/seedance-2.0-fast")
+
+    assert aufgezeichnet["body"]["duration"] == 4
+    assert aufgezeichnet["body"]["size"] == "720x1280"
+
+
+def test_erzeugen_laesst_ausdrueckliche_werte_unangetastet(monkeypatch, tmp_path):
+    aufgezeichnet = {}
+
+    @__import__("contextlib").contextmanager
+    def fake_link(pfad, remote=None):
+        yield "https://beispiel.invalid/bild.png"
+
+    def fake_req(method, path, body=None):
+        aufgezeichnet["body"] = body
+        return 200, b'{"id": "abc"}'
+
+    monkeypatch.setattr(storyboard_video, "kurzlebiger_link", fake_link)
+    monkeypatch.setattr(storyboard_video.orv, "req", fake_req)
+    monkeypatch.setattr(storyboard_video.orv, "warten", lambda *a, **k: {"usage": 0})
+    monkeypatch.setattr(storyboard_video.orv, "laden", lambda *a, **k: None)
+
+    bild = tmp_path / "storyboard.png"
+    bild.write_bytes(b"x")
+    storyboard_video.erzeugen(
+        str(bild), str(tmp_path / "ziel.mp4"), "prompt",
+        modell="bytedance/seedance-2.0-fast", dauer=8, size="1080x1920",
+    )
+
+    assert aufgezeichnet["body"]["duration"] == 8
+    assert aufgezeichnet["body"]["size"] == "1080x1920"
 
 
 # --- Schlüssel wird nie in Ausgaben geschrieben ---------------------------

@@ -21,15 +21,39 @@ import openrouter as orv
 
 STANDARD_MODELL = "bytedance/seedance-2.0"
 
+# Ein "-fast"-Modell ist zum günstigen Testen da. Ohne ausdrückliche Angabe
+# nimmt es automatisch 4 Sekunden in 720x1280 statt der teureren Standardwerte
+# für den echten Clip (10 Sekunden, 1080x1920).
+FAST_DAUER = 4
+FAST_SIZE = "720x1280"
+STANDARD_DAUER = 10
+STANDARD_SIZE = "1080x1920"
+
+
+def ist_fast_modell(modell: str) -> bool:
+    return modell.endswith("-fast")
+
+
+def standardwerte(modell: str) -> tuple[int, str]:
+    """Liefert (Dauer, Größe), die gelten, wenn nichts ausdrücklich angegeben
+    wurde: für ein "-fast"-Modell die günstigen Testwerte, sonst die
+    Standardwerte für den echten Clip."""
+    if ist_fast_modell(modell):
+        return FAST_DAUER, FAST_SIZE
+    return STANDARD_DAUER, STANDARD_SIZE
+
 
 def erzeugen(
     bild: str,
     ziel: str,
     prompt: str,
     modell: str = STANDARD_MODELL,
-    dauer: int = 10,
-    size: str = "1080x1920",
+    dauer: int | None = None,
+    size: str | None = None,
 ) -> dict:
+    auto_dauer, auto_size = standardwerte(modell)
+    dauer = dauer if dauer is not None else auto_dauer
+    size = size if size is not None else auto_size
     with kurzlebiger_link(bild) as url:
         status, antwort = orv.req(
             "POST",
@@ -59,9 +83,9 @@ def main() -> None:
     a.add_argument("bild")
     a.add_argument("ziel")
     a.add_argument("prompt")
-    a.add_argument("--dauer", type=int, default=10)
+    a.add_argument("--dauer", type=int, default=None, help="Standard: 10s, oder 4s bei einem -fast-Modell")
     a.add_argument("--modell", default=STANDARD_MODELL)
-    a.add_argument("--size", default="1080x1920")
+    a.add_argument("--size", default=None, help="Standard: 1080x1920, oder 720x1280 bei einem -fast-Modell")
     x = a.parse_args()
     try:
         erzeugen(x.bild, x.ziel, x.prompt, x.modell, x.dauer, x.size)

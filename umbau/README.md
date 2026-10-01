@@ -14,22 +14,31 @@ Du musst dafür nicht programmieren können. Alles, was Claude für dich
 
 ## Was das kostet
 
-Ein ganzes Umbau-Reel mit mehreren Abschnitten kostet meist zwischen 1 und
-1,50 US-Dollar. Ein Werbeclip ohne Kamera kostet rund 3,80 US-Dollar. Das sind
-Beträge für Rechenzeit, keine Abos: du zahlst nur für das, was du wirklich
-erzeugst.
+OpenRouter rechnet in Dollar ab, deshalb unten beide Angaben; die Euro-Beträge
+sind zum Kurs vom 30.09.2026 (1 € = 1,1355 $) gerechnet und schwanken mit dem
+Wechselkurs leicht. Ein ganzes Umbau-Reel mit mehreren Abschnitten kostet
+meist zwischen 1 und 1,30 Euro. Ein Werbeclip ohne Kamera kostet rund
+3,30 Euro. Das sind Beträge für Rechenzeit, keine Abos: du zahlst nur für
+das, was du wirklich erzeugst.
 
 | Werkzeug | Wofür | Preis (ungefähr) |
 |---|---|---|
-| `black-forest-labs/flux-video-edit` | **Deine echte Aufnahme umbauen**: Gegenstand, Fensterblick, Outfit | 3 Cent je Sekunde |
-| `runway/aleph-2` | Premium-Alternative zum Umbauen, manchmal natürlicheres Gesicht | 28 Cent je Sekunde |
-| `bytedance/seedance-2.0` | **Neue Szenen ohne Gesicht erzeugen**: Werbeclip, Erklärclip, aus Storyboard | ca. 38 Cent je Sekunde in 1080x1920 |
-| `bytedance/seedance-2.0-fast` | Schneller, günstiger Test in 720p | ca. 9 Cent je Sekunde |
-| `black-forest-labs/flux-video-upscale` | Optional schärfen | ca. 14 Cent je Sekunde, nur bei großen Flächen nah an der Kamera spürbar besser |
+| `black-forest-labs/flux-video-edit` | **Deine echte Aufnahme umbauen**: Gegenstand, Fensterblick, Outfit | rund 2,6 Cent je Sekunde (3 Cent-Dollar) |
+| `runway/aleph-2` | Premium-Alternative zum Umbauen, manchmal natürlicheres Gesicht | rund 25 Cent je Sekunde (28 Cent-Dollar) |
+| `bytedance/seedance-2.0` | **Neue Szenen ohne Gesicht erzeugen**: Werbeclip, Erklärclip, aus Storyboard | rund 33 Cent je Sekunde (ca. 38 Cent-Dollar) in 1080x1920 |
+| `bytedance/seedance-2.0-fast` | Schneller, günstiger Test in 720p | rund 8 Cent je Sekunde (ca. 9 Cent-Dollar) |
+| `black-forest-labs/flux-video-upscale` | Optional schärfen | rund 12 Cent je Sekunde (ca. 14 Cent-Dollar), nur bei großen Flächen nah an der Kamera spürbar besser |
 | Maske beim Einsetzen | Qualität ohne Aufpreis | 0, immer an |
 
 Merksatz dazu: **FLUX, wenn du dich selbst umbaust. Seedance, wenn du etwas
 ohne Kamera erzeugst. Die Maske macht den Unterschied.**
+
+Echte Beispielrechnung aus einem echten Lauf: fünf Umbauten mit
+flux-video-edit (zusammen 33 Sekunden) kosteten 1,03 Euro (1,17 Dollar), mit
+Maske ohne Aufpreis. Ein Werbeclip mit Seedance (10 Sekunden) kostete
+3,31 Euro (3,76 Dollar). Derselbe Abschnitt mit der Premium-Alternative
+Aleph statt FLUX kostete für nur 4,4 Sekunden 1,23 Euro (1,40 Dollar), der
+optionale Schärfer für dieselben 4,4 Sekunden 0,55 Euro (0,62 Dollar).
 
 ## Einrichtung
 
@@ -42,9 +51,10 @@ Sag deinem Claude:
 Was dabei passiert:
 
 1. **OpenRouter-Konto.** Du legst selbst ein Konto auf openrouter.ai an und
-   lädst etwa 10 US-Dollar Guthaben auf. Das reicht für rund acht
-   Umbau-Reels oder zwei Werbeclips plus ein paar Tests. Danach erzeugst du
-   dort einen Schlüssel (eine lange Zeichenfolge, die mit `sk-or-` beginnt).
+   lädst etwa 10 Dollar Guthaben auf, rund 9 Euro (OpenRouter rechnet nur in
+   Dollar ab). Das reicht für rund acht Umbau-Reels oder zwei Werbeclips plus
+   ein paar Tests. Danach erzeugst du dort einen Schlüssel (eine lange
+   Zeichenfolge, die mit `sk-or-` beginnt).
 2. **Schlüssel im Schlüsselbund.** Gib den Schlüssel nie in den Chat.
    Claude legt ihn für dich im macOS-Schlüsselbund unter dem Namen
    `openrouter-api-key` ab, du fügst den Wert nur einmal in den
@@ -67,16 +77,23 @@ Was dabei passiert:
 
 ## Ablauf 1: deine eigene Aufnahme umbauen
 
-So nimmst du auf: iPhone-Kamera ohne HDR, 30 Bilder pro Sekunde (HDR wirkt
-nach der Umrechnung flau, 24 Bilder pro Sekunde ruckeln im Schnitt). Handy
-fest halten. Kündige im Satz an, was passiert ("mein Stift, oder besser: mein
-Zauberstab"), und gib bei einem Wechsel ein klares Signal, zum Beispiel ein
-Klatschen.
+So nimmst du auf: **Hochformat, 9:16** (wie ein normales Reel), iPhone-Kamera
+ohne HDR, 30 Bilder pro Sekunde (HDR wirkt nach der Umrechnung flau, 24 Bilder
+pro Sekunde ruckeln im Schnitt). Handy fest halten. Kündige im Satz an, was
+passiert ("mein Stift, oder besser: mein Zauberstab"), und gib bei einem
+Wechsel ein klares Signal, zum Beispiel ein Klatschen.
+
+Alle Befehle unten arbeiten in einem einzigen, einheitlichen Arbeitsordner
+je Video, zum Beispiel `umbau/arbeit/<name>`. Leg ihn einmal an (oder lass
+ihn von Claude anlegen) und bleib dann für diese Aufnahme konsequent bei
+genau diesem Pfad, auch wenn du die Befehle aus einem anderen Verzeichnis
+heraus aufrufst.
 
 Sag deinem Claude danach:
 
 > Ich hab eine Aufnahme <Datei> abgelegt. Mach ein Transkript mit Wortzeiten,
-> schlag mir Abschnitte für einen Umbau vor und bau sie dann mit umbau/ um.
+> schlag mir Abschnitte für einen Umbau vor und bau sie dann mit umbau/ um,
+> alles im Arbeitsordner umbau/arbeit/<name>.
 
 Was dabei im Hintergrund passiert:
 
@@ -84,16 +101,17 @@ Was dabei im Hintergrund passiert:
    nutzt Claude `uv run pipeline transkript`. Sonst reicht ein lokales
    Whisper-Werkzeug (`mlx_whisper` auf einem Mac mit Apple-Chip, sonst
    `faster-whisper`), das jedes Wort mit Start- und Endzeit ausgibt.
-2. **Abschnitte festlegen.** Aus den Wortzeiten entsteht `abschnitte.json`:
-   eine Liste von `{"name": "hawaii", "von": 39.74, "bis": 44.10}`. Ein
-   Abschnitt beginnt kurz vor dem Wort, das den Umbau ankündigt, und endet
-   vor dem nächsten. Höchstens etwa 11 Sekunden je Abschnitt.
+2. **Abschnitte festlegen.** Aus den Wortzeiten entsteht
+   `umbau/arbeit/<name>/abschnitte.json`: eine Liste von
+   `{"name": "hawaii", "von": 39.74, "bis": 44.10}`. Ein Abschnitt beginnt
+   kurz vor dem Wort, das den Umbau ankündigt, und endet vor dem nächsten.
+   Höchstens etwa 11 Sekunden je Abschnitt.
 3. **Vorlage und Abschnitte schneiden:**
-   `python3 umbau/abschnitte.py <aufnahme> <arbeitsordner>`
-   baut `master.mov` (die durchgehende Vorlage) und je Eintrag
-   `seg-<name>.mp4`.
+   `python3 umbau/abschnitte.py <aufnahme> umbau/arbeit/<name>`
+   baut `umbau/arbeit/<name>/master.mov` (die durchgehende Vorlage) und je
+   Eintrag `umbau/arbeit/<name>/seg-<abschnittsname>.mp4`.
 4. **Umbauen**, je Abschnitt einmal:
-   `python3 umbau/umbauen.py seg-<name>.mp4 edit-<name>.mp4 "<prompt>"`
+   `python3 umbau/umbauen.py umbau/arbeit/<name>/seg-<abschnittsname>.mp4 umbau/arbeit/<name>/edit-<abschnittsname>.mp4 "<prompt>"`
    Jeder Prompt endet mit einem Behalte-Satz, der alles andere unverändert
    lässt (siehe unten). Optional danach schärfen mit
    `--modell black-forest-labs/flux-video-upscale` über dasselbe Werkzeug,
@@ -102,14 +120,28 @@ Was dabei im Hintergrund passiert:
    bauen (ein Bildraster über die Dauer des Clips) und sieh jeden Umbau an.
    Wirkt ein Gegenstand falsch, wirf den Versuch weg und beschreibe ihn
    genauer (siehe Fallen unten).
-6. **Einsetzen mit Maske und Farbabgleich:**
-   `python3 umbau/einsetzen.py <arbeitsordner>`
-   Das Ergebnis ist `master_umbau.mov`: dieselbe Zeitachse wie deine
-   Aufnahme, Originalton, nur die Abschnitte sind ausgetauscht. Flackert ein
-   Rand am Hals oder Ärmel, probier `--schwelle 35` bis `--schwelle 45`.
-   Fehlt ein dünner Gegenstand zeitweise, probier `--schwelle 20`.
-7. **Schneiden.** `master_umbau.mov` geht danach in den normalen Schnitt
-   deiner Pipeline, genau wie jede andere Aufnahme.
+6. **Wandfeld für den Farbabgleich markieren (Pflichtschritt).** Das
+   Umbaumodell gibt das Bild oft dunkler zurück, und wie stark hängt von
+   deiner Aufnahme ab, nicht von einem festen Wert. Sag deinem Claude:
+   "Markiere auf einem Standbild ein Stück Wand, das in keinem Umbau
+   verändert wird, und zeig es mir." Du bekommst daraus vier Zahlen
+   (B:H:X:Y, also Breite:Höhe:X:Y in Pixeln).
+7. **Einsetzen mit Maske und Farbabgleich:**
+   `python3 umbau/einsetzen.py umbau/arbeit/<name> --feld B:H:X:Y`
+   Ohne `--feld` bricht das Werkzeug mit einer klaren Meldung ab, statt ein
+   Feld zu raten, das zu deiner Aufnahme gar nicht passt. Das Ergebnis ist
+   `umbau/arbeit/<name>/master_umbau.mov`: dieselbe Zeitachse wie deine
+   Aufnahme, Originalton, nur die Abschnitte sind ausgetauscht.
+
+   Was die Maske wirklich tut: Sie übernimmt nur, was sich zwischen Original
+   und Umbau deutlich verändert hat (Hemd, Fensterblick, Gegenstand). Gesicht
+   und Arme bleiben in der Regel echtes Video, weil sie sich dort kaum
+   ändern, nicht weil die Maske sie erkennt. Prüf das Ergebnis am
+   Kontaktbogen: Flackert ein Rand am Hals oder Ärmel, probier
+   `--schwelle 35` bis `--schwelle 45`. Fehlt ein dünner Gegenstand
+   zeitweise, probier `--schwelle 20`.
+8. **Schneiden.** `umbau/arbeit/<name>/master_umbau.mov` geht danach in den
+   normalen Schnitt deiner Pipeline, genau wie jede andere Aufnahme.
 
 ### Prompts, die funktioniert haben
 
@@ -146,7 +178,11 @@ Storyboard, danach setzt Seedance es als Video um.
    Vorlage mit, sonst male das Storyboard den falschen Klickweg.
 2. **Video erzeugen:**
    `python3 umbau/storyboard_video.py storyboard.png ziel.mp4 "folge dem Storyboard Feld für Feld, eine Sekunde je Feld"`
-   Zum günstigen Testen in 720p: `--modell bytedance/seedance-2.0-fast`.
+   Zum günstigen Testen in 720p:
+   `python3 umbau/storyboard_video.py storyboard.png test.mp4 "folge dem Storyboard Feld für Feld, eine Sekunde je Feld" --modell bytedance/seedance-2.0-fast --dauer 4 --size 720x1280`
+   Mit einem `-fast`-Modell setzt `storyboard_video.py` `--dauer 4` und
+   `--size 720x1280` auch automatisch, wenn du sie weglässt; ausdrücklich
+   angegebene Werte haben trotzdem Vorrang.
 3. **Endkarte und Schritt-Einblendungen** baust du am besten als HTML und
    rendertst sie mit einem Headless-Browser, dann stimmen Schrift und
    Abstand. Bildschirmschrift kommt in Seedance nur angedeutet, deshalb

@@ -8,7 +8,13 @@ von selbst. Setzt man stattdessen das ganze umgebaute Bild ein, sieht ein Arm
 schnell unnatürlich aus und hat die falsche Farbe. Die Maske löst Farbe UND
 Schärfe zugleich und kostet nichts zusätzlich.
 
-Aufruf: einsetzen.py arbeitsordner [--modus maske|ganz] [--schwelle 28] [--feld 200:180:860:60]
+Aufruf: einsetzen.py arbeitsordner --feld 200:180:860:60 [--modus maske|ganz] [--schwelle 28]
+
+--feld ist Pflicht: ein Stück Wand, das in KEINEM Umbau verändert wird, als
+B:H:X:Y in Pixeln (Breite:Höhe:X:Y). Es hängt an der jeweiligen Aufnahme
+(Kameraposition, Raum) und lässt sich nicht sinnvoll erraten. Ohne eigenes
+Feld bricht das Werkzeug mit einer klaren Meldung ab, statt still irgendein
+Feld anzunehmen und einen falschen Farbabgleich zu rechnen.
 
 Erwartet im Ordner: master.mov (1080x1920, 30 fps, Originalton), abschnitte.json
 ([{"name": "hawaii", "von": 39.74, "bis": 44.10}, ...]) und je Abschnitt
@@ -22,6 +28,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 
 
 def farbfaktor(soll: list[float], ist: list[float]) -> list[float]:
@@ -74,6 +81,20 @@ def mittel(feld: str, datei: str, t: float) -> list[int]:
         capture_output=True, check=True,
     ).stdout
     return list(out[:3])
+
+
+def feld_erzwingen(feld: str | None) -> str:
+    """Bricht mit einer klaren Meldung ab, statt still ein Wandfeld zu raten.
+    Das Feld hängt an der jeweiligen Aufnahme (Kameraposition, Raum) und ist
+    in keiner Aufnahme automatisch richtig."""
+    if not feld:
+        raise ValueError(
+            "einsetzen.py braucht --feld: ein Stück Wand, das in KEINEM Umbau "
+            "verändert wird, als B:H:X:Y in Pixeln. Sag deinem Claude: "
+            "Markiere auf einem Standbild ein Stück Wand, das in keinem Umbau "
+            "verändert wird, und zeig es mir."
+        )
+    return feld
 
 
 def quelle_waehlen(ordner: str, name: str) -> str:
@@ -135,12 +156,17 @@ def main() -> None:
     a.add_argument("ordner")
     a.add_argument("--modus", choices=["maske", "ganz"], default="maske")
     a.add_argument("--schwelle", type=int, default=28, help="Mindestunterschied (0-255), ab dem ein Pixel als umgebaut gilt")
-    a.add_argument("--feld", default="200:180:860:60", help="Wandstück für den Farbabgleich, in keinem Umbau verändert")
+    a.add_argument("--feld", default=None, help="Pflicht: Wandstück B:H:X:Y für den Farbabgleich, in keinem Umbau verändert")
     x = a.parse_args()
+    try:
+        feld = feld_erzwingen(x.feld)
+    except ValueError as e:
+        print("FEHLER", e, file=sys.stderr)
+        sys.exit(1)
     with open(os.path.join(x.ordner, "abschnitte.json"), encoding="utf-8") as f:
         abschnitte = json.load(f)
     for eintrag in abschnitte:
-        comp, faktoren = abschnitt_einsetzen(x.ordner, eintrag, x.modus, x.schwelle, x.feld)
+        comp, faktoren = abschnitt_einsetzen(x.ordner, eintrag, x.modus, x.schwelle, feld)
         print(eintrag["name"], x.modus, "Farbfaktor", [round(v, 3) for v in faktoren], "->", comp)
     ziel = zusammenfuegen(x.ordner, abschnitte)
     print("OK", ziel)

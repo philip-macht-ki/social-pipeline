@@ -15,6 +15,7 @@ import contextlib
 import os
 import re
 import subprocess
+import sys
 from typing import Iterator
 
 ZIEL_STANDARD = "gdrive:umbau-tmp"
@@ -49,11 +50,40 @@ def hochladen(pfad: str, remote: str | None = None) -> tuple[str, str]:
     return name, drive_id_zu_link(file_id)
 
 
+def ist_noch_da(remote: str, name: str) -> bool:
+    """Prüft mit `rclone lsf`, ob die Datei im Remote-Ordner noch auftaucht."""
+    ergebnis = subprocess.run(
+        ["rclone", "lsf", f"{remote}/"], capture_output=True, text=True,
+    )
+    return name in ergebnis.stdout.splitlines()
+
+
 def weg(name: str, remote: str | None = None) -> None:
-    """Löscht die Datei endgültig. Aus dem Papierkorb bleibt der Link weiter
-    abrufbar, darum --drive-use-trash=false statt eines normalen Löschens."""
+    """Löscht die Datei endgültig und kontrolliert danach mit `rclone lsf`,
+    ob sie wirklich weg ist. Aus dem Papierkorb bleibt der Link weiter
+    abrufbar, darum --drive-use-trash=false statt eines normalen Löschens.
+    Schlägt das Löschen fehl oder taucht die Datei danach noch auf, wird laut
+    gewarnt statt still weiterzumachen, mit dem genauen Befehl zum
+    Nachlöschen."""
     remote = remote or ziel()
-    subprocess.run(["rclone", "deletefile", "--drive-use-trash=false", f"{remote}/{name}"])
+    pfad = f"{remote}/{name}"
+    befehl = f"rclone deletefile --drive-use-trash=false {pfad}"
+    ergebnis = subprocess.run(
+        ["rclone", "deletefile", "--drive-use-trash=false", pfad], capture_output=True, text=True,
+    )
+    if ergebnis.returncode != 0:
+        print(
+            f"WARNUNG: Löschen von {pfad} ist fehlgeschlagen "
+            f"(Rückgabecode {ergebnis.returncode}). Lösch von Hand mit: {befehl}",
+            file=sys.stderr,
+        )
+        return
+    if ist_noch_da(remote, name):
+        print(
+            f"WARNUNG: {pfad} steht nach dem Löschen noch in der Dateiliste. "
+            f"Lösch von Hand mit: {befehl}",
+            file=sys.stderr,
+        )
 
 
 @contextlib.contextmanager
