@@ -7,13 +7,28 @@ tmp-Ordner, nie im echten arbeit/. Das Urteil läuft ohne Modell.
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from pipeline import kern, schrift
 
 ECHT = Path(__file__).resolve().parents[1]
+if str(ECHT / "umbau") not in sys.path:
+    sys.path.insert(0, str(ECHT / "umbau"))
+import budget  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _ki_budget_abgeschirmt(tmp_path, monkeypatch):
+    """Kein Test bucht ins echte arbeit/ki_budget.json oder zeigt eine echte
+    Mac-Mitteilung. Auch Tests ohne `repo` rufen budget über storyboard_video
+    und umbauen auf; ohne diese Abschirmung landeten ihre Schein-Buchungen im
+    echten Monatsdeckel und der Deckel-Test meldete per osascript."""
+    monkeypatch.setattr(budget, "_datei", lambda: tmp_path / "arbeit" / "ki_budget.json")
+    monkeypatch.setattr(budget, "subprocess", SimpleNamespace(run=lambda *a, **k: None))
 
 
 @pytest.fixture
