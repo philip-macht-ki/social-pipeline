@@ -51,6 +51,9 @@ trägt zusätzlich `"stil": "lesereel"` beziehungsweise `"uebermalt"`.
 Das Lese-Reel erhält sein Thema aus `titel` und `aussage` der Rezepte eines
 Takes. Beide Zusatzstücke lassen im selben Modellurteil eine kurze Caption
 erzeugen, die mit einer Frage endet.
+Aufgenommene fertige Videos heißen `U01`, `U02` für Umbauten und `W01`, `W02`
+für Werbeclips. Ihr Rezept liegt unter `arbeit/<id>/stuecke/01/`, ihr Manifest
+trägt `"stil": "umbau"` beziehungsweise `"werbeclip"`.
 
 Weitere Eingangsordner stehen als `weitere_ordner` unter `[eingang]` in
 `konfig/pipeline.toml`. Der Eingang übernimmt daraus nur fertige Video-Dateien,
@@ -177,3 +180,4 @@ Eine Liste. **Schlüssel ist immer (kanal, plan_id).** Wer liest, filtert nach K
 | `plan.py`, `posten/`, `betrieb.py` | planen, zeigen, freigeben, posten, vorrat, status, zeitplan, instagram-token, youtube-anmelden |
 | `cli.py`, `pruefen.py` | pruefen, tag |
 | `ki_einblendung.py`, `umbau/budget.py` | ki-budget |
+| `aufnehmen.py` | aufnehmen |

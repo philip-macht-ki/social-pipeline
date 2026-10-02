@@ -24,6 +24,7 @@ BEFEHLE: dict[str, tuple[str, str, str]] = {
     "texte": ("texte", "befehl", "Texte je Plattform"),
     "bilder": ("stile", "befehl", "Bilder, Karussells, Pins, Fotobeiträge, Threads-Texte"),
     "kurzstuecke": ("kurzstuecke", "befehl", "Stille Lese-Reels und übermalte Sätze bauen"),
+    "aufnehmen": ("aufnehmen", "befehl", "Fertiges Umbauvideo in die Pipeline aufnehmen"),
     "planen": ("plan", "befehl_planen", "Fertiges auf Sendeplätze verteilen"),
     "zeigen": ("plan", "befehl_zeigen", "Offene Planeinträge zum Ansehen auflisten"),
     "freigeben": ("plan", "befehl_freigeben", "Planeinträge freigeben"),
@@ -50,6 +51,11 @@ def parser() -> argparse.ArgumentParser:
     ap.add_argument("--kanal", help="Nur diese Plattform")
     ap.add_argument("--tage", type=int, help="Planungshorizont in Tagen")
     ap.add_argument("--trocken", action="store_true", help="Nur zeigen, nichts ändern")
+    ap.add_argument("--name", help="Name des aufgenommenen Videos, zum Beispiel U01")
+    ap.add_argument("--art", choices=("umbau", "werbeclip"), default="umbau",
+                    help="Art des fertigen Videos")
+    ap.add_argument("--titel", help="Titel des Videos")
+    ap.add_argument("--beschreibung", help="Kernaussage des Videos")
     return ap
 
 

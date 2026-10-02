@@ -204,30 +204,64 @@ def _lese_video(take: str, text: str, ziel: Path) -> None:
 
 
 def _uebermalt_layout(daten: dict) -> dict:
-    """Misst die drei Satzzeilen und die bewusst abgesetzte Handschrift."""
+    """Misst Körpertexte mit bis zu zwei Zeilen und die Handschrift."""
     max_breite = int(BREITE * 0.80)
-    koerper = None
-    for grad in range(320, 31, -2):
+
+    def umbrechen(text: str, font) -> list[str] | None:
+        if breite(text, font) <= max_breite:
+            return [text]
+        woerter = text.split()
+        kandidaten = []
+        for i in range(1, len(woerter)):
+            zeilen = [" ".join(woerter[:i]), " ".join(woerter[i:])]
+            if max(breite(z, font) for z in zeilen) <= max_breite:
+                kandidaten.append(zeilen)
+        return min(kandidaten, key=lambda z: abs(breite(z[0], font) - breite(z[1], font))) if kandidaten else None
+
+    # Der Block steht mittig zwischen oben 300 und unten 300 (Sicherheitsrahmen).
+    platz = HOEHE - 600
+
+    def handgrad(koerper: int, text: str) -> int:
+        """Handschrift mindestens so groß wie der Text, höchstens 1,6-fach."""
+        for grad in range(int(koerper * 1.6), koerper - 1, -2):
+            if breite(text, schrift("hand", grad)) <= max_breite:
+                return grad
+        return koerper
+
+    gefunden = None
+    for grad in range(150, 31, -2):
         font = schrift("text_normal", grad)
-        if all(breite(daten[feld], font) <= max_breite for feld in ("vorher", "falsch", "nachsatz")):
-            koerper = grad
+        zeilen = {"vorher": umbrechen(daten["vorher"], font),
+                  "falsch": [daten["falsch"]] if breite(daten["falsch"], font) <= max_breite else None,
+                  "nachsatz": umbrechen(daten["nachsatz"], font)}
+        if not all(zeilen.values()):
+            continue
+        zeilenhoehe = int(hoehe(font) * 1.15)
+        hand = handgrad(grad, daten["richtig"])
+        hand_hoehe = hoehe(schrift("hand", hand))
+        abstand_oben, abstand_hand, abstand_unten = 40, 10, int(zeilenhoehe * 0.6)
+        gesamt = (len(zeilen["vorher"]) * zeilenhoehe + abstand_oben + hand_hoehe + abstand_hand
+                  + zeilenhoehe + abstand_unten + len(zeilen["nachsatz"]) * zeilenhoehe)
+        if gesamt <= platz:
+            gefunden = grad
             break
-    if koerper is None:
+    if gefunden is None:
         raise ValueError("Satzteile passen nicht in den Sicherheitsrahmen.")
-    hand = None
-    for grad in range(220, koerper, -2):
-        font = schrift("hand", grad)
-        if breite(daten["richtig"], font) <= max_breite:
-            hand = grad
-            break
-    if hand is None:
-        hand = koerper
+    koerper, zeilentexte = gefunden, zeilen
+    vorher_y = max(300, (HOEHE - gesamt) // 2)
+    richtig_y = vorher_y + len(zeilentexte["vorher"]) * zeilenhoehe + abstand_oben
+    falsch_y = richtig_y + hand_hoehe + abstand_hand
+    nachsatz_y = falsch_y + zeilenhoehe + abstand_unten
+    if nachsatz_y + len(zeilentexte["nachsatz"]) * zeilenhoehe > HOEHE - 300:
+        raise ValueError("Satzblock passt nicht in den Sicherheitsrahmen.")
     return {
         "block_breite": max_breite,
         "koerper": koerper,
         "hand": hand,
-        "zeilen": {"vorher": 480, "falsch": 930, "nachsatz": 1170},
-        "richtig_y": 650,
+        "zeilentexte": zeilentexte,
+        "zeilenhoehe": zeilenhoehe,
+        "zeilen": {"vorher": vorher_y, "falsch": falsch_y, "nachsatz": nachsatz_y},
+        "richtig_y": richtig_y,
     }
 
 
@@ -239,9 +273,10 @@ def _uebermalt_bilder(daten: dict, ordner: Path) -> tuple[Path, Path, Path]:
     zeichner = ImageDraw.Draw(basis)
     font = schrift("text_normal", layout["koerper"])
     for feld in ("vorher", "falsch", "nachsatz"):
-        x = (BREITE - breite(daten[feld], font)) // 2
-        zeichner.text((x, layout["zeilen"][feld]), daten[feld], font=font,
-                      fill=farben.get("dunkel", "#1B1A2E"))
+        for nr, text in enumerate(layout["zeilentexte"][feld]):
+            x = (BREITE - breite(text, font)) // 2
+            y = layout["zeilen"][feld] + nr * layout["zeilenhoehe"]
+            zeichner.text((x, y), text, font=font, fill=farben.get("dunkel", "#1B1A2E"))
     mitte = basis.copy()
     ende = basis.copy()
     y = layout["zeilen"]["falsch"] + hoehe(font) // 2

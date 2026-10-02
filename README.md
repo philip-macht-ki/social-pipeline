@@ -55,6 +55,7 @@ mindestens drei Minuten unverändert beobachtet wurden.
 | Texte je Plattform | `pipeline texte` | Modell, Code prüft Grenzen |
 | Bilder, Karussells, Pins, Threads | `pipeline bilder` | Modell für Text, Code für Bild |
 | Stille Lese-Reels und übermalte Sätze | `pipeline kurzstuecke [take …]` | Modell für Inhalt, Code für Bild und Schnitt |
+| Fertiges Umbauvideo aufnehmen | `pipeline aufnehmen <datei> [--name U01] [--art umbau|werbeclip]` | Code und Modell für Texte |
 | Auf Sendeplätze verteilen | `pipeline planen` | Code |
 | Ansehen und freigeben | `pipeline zeigen`, `pipeline freigeben` | du |
 | Veröffentlichen | `pipeline posten --echt` | Code |

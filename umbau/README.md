@@ -240,3 +240,10 @@ Fertige Sätze zum Kopieren:
 > und Werbeclips es noch reicht.
 
 > Prüf das Schema von <neuer Modellname>, bevor wir damit etwas erzeugen.
+
+## In den Plan
+
+Ist dein Umbau fertig, nimm ihn mit `uv run pipeline aufnehmen <datei> --art umbau`
+in den Plan auf. Für einen Storyboard-Clip lautet der Befehl
+`uv run pipeline aufnehmen <datei> --art werbeclip`. Optional gibst du mit
+`--titel "…"` und `--beschreibung "…"` die redaktionelle Einordnung vor.

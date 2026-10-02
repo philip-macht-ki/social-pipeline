@@ -92,7 +92,7 @@ def test_uebermalt_auftrag_nachbessert_verneinung_und_fordert_caption(repo, monk
     assert '"caption":"…?"' in auftraege[0][0]
 
 
-def test_uebermalt_setzt_grosse_einzelzeilen_und_handschrift_mit_abstand(repo, tmp_path):
+def test_uebermalt_setzt_grosse_zeilen_und_handschrift_mit_abstand(repo, tmp_path):
     daten = {
         "vorher": "Das Problem liegt bei",
         "falsch": "Zu viele Schritte.",
@@ -104,13 +104,23 @@ def test_uebermalt_setzt_grosse_einzelzeilen_und_handschrift_mit_abstand(repo, t
     font = schrift("text_normal", layout["koerper"])
     assert layout["block_breite"] == 864
     assert max(breite(daten[feld], font) for feld in ("vorher", "falsch", "nachsatz")) >= 692
-    assert all(breite(daten[feld], font) <= layout["block_breite"] for feld in ("vorher", "falsch", "nachsatz"))
+    assert all(breite(zeile, font) <= layout["block_breite"]
+               for zeilen in layout["zeilentexte"].values() for zeile in zeilen)
     hand = schrift("hand", layout["hand"])
     vorher_unten = layout["zeilen"]["vorher"] + hoehe(font)
     assert layout["richtig_y"] > vorher_unten
     assert layout["richtig_y"] + hoehe(hand) < layout["zeilen"]["falsch"]
     wege = kurzstuecke._uebermalt_bilder(daten, tmp_path)
     assert all(Image.open(weg).size == (1080, 1920) for weg in wege)
+
+
+def test_uebermalt_umbricht_nachsatz_und_bleibt_deutlich_groesser(repo):
+    daten = {"vorher": "Das Problem ist", "falsch": "der Inhalt", "richtig": "die Handgriffe",
+             "nachsatz": "vom Gedanken zum fertigen Video", "caption": "Was zählt für dich?"}
+    layout = kurzstuecke._uebermalt_layout(daten)
+    assert len(layout["zeilentexte"]["nachsatz"]) == 2
+    assert layout["koerper"] == 96
+    assert layout["richtig_y"] + hoehe(schrift("hand", layout["hand"])) < layout["zeilen"]["falsch"]
 
 
 def test_lesereel_rueckfall_verdunkelt_und_zeichnet_weich(repo, monkeypatch, tmp_path):
