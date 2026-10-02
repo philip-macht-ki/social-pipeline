@@ -26,6 +26,11 @@ def test_auswahl_nimmt_am_wenigsten_benutzten_und_nie_heute_doppelt(repo):
     assert len(wahl) == 2
 
 
+def test_auswahl_kennt_die_neuen_instagram_karussells(repo):
+    wahl = redaktion.auswahl("instagram", "karussell", 6, {}, heute="2026-09-28")
+    assert {"foto", "handschrift_liste", "rasterposter"} <= set(wahl)
+
+
 def test_gesperrter_stil_kommt_nie(repo):
     stile_toml = (repo / "konfig" / "stile.toml").read_text()
     (repo / "konfig" / "stile.toml").write_text(stile_toml.replace(
@@ -73,3 +78,25 @@ def test_passt_nicht_erzeugt_kein_bild(repo, monkeypatch):
     monkeypatch.setattr(redaktion, "texte_fuer_take", antwort)
     stile.befehl(argparse.Namespace(ziel=[], neu=False))
     assert not list((repo / "ausgabe" / "bilder").glob("*/bild.json"))
+
+
+def test_neuer_karussellstil_faellt_auf_schritte_zurueck(repo, monkeypatch):
+    _take(repo)
+    monkeypatch.setattr(redaktion, "plan_fuer_take", lambda benutzt: [("instagram", "karussell", "foto")])
+    monkeypatch.setattr(redaktion, "texte_fuer_take", lambda take, gewuenscht: {"stile": [{
+        "plattform": "instagram", "stil": "foto", "passt_nicht": "Keine vier passenden Sätze."
+    }]})
+    assert stile.befehl(argparse.Namespace(ziel=[], neu=False)) == 0
+    manifest = json.loads(next((repo / "ausgabe" / "bilder").glob("*/bild.json")).read_text())
+    benutzt = kern.lesen(repo / "arbeit" / "stile_benutzt.json", {})
+    assert manifest["stil"] == "schritte"
+    assert "Rückfall auf schritte" in manifest["befunde"][0]
+    assert "instagram/foto" not in benutzt
+    assert benutzt["instagram/schritte"]["anzahl"] == 1
+
+
+def test_neue_stilgrenzen_werden_vor_dem_rendern_geprueft():
+    eintrag = {"plattform": "instagram", "stil": "rasterposter", "felder": {"punkte": [
+        {"stichwort": "A", "satz": "B"} for _ in range(8)
+    ]}}
+    assert "neun" in redaktion._stilgrenzen(eintrag)

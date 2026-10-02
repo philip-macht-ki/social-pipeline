@@ -65,6 +65,26 @@ def verlauf(breite_px: int, hoehe_px: int, oben: str, unten: str):
     return im
 
 
+LINIENPAPIER_ERSTE_LINIE = 150
+LINIENPAPIER_ABSTAND = 74
+
+
+def linienpositionen(hoehe_px: int, abstand: int = LINIENPAPIER_ABSTAND) -> list[int]:
+    """Grundlinien des linierten Papiers, damit Schrift und Papier dasselbe Raster nutzen."""
+    return list(range(LINIENPAPIER_ERSTE_LINIE, hoehe_px - 90, abstand))
+
+
+def linienpapier(breite_px: int, hoehe_px: int, papier: str, linie: str,
+                 abstand: int = LINIENPAPIER_ABSTAND):
+    """Helles Papier mit zurückhaltenden Schreiblinien für handschriftliche Listen."""
+    im = bild(breite_px, hoehe_px, papier)
+    zeichner = ImageDraw.Draw(im)
+    for y_position in linienpositionen(hoehe_px, abstand):
+        zeichner.line((70, y_position, breite_px - 70, y_position), fill=linie, width=2)
+    zeichner.line((135, 85, 135, hoehe_px - 85), fill=linie, width=3)
+    return im
+
+
 def _hex_zu_rgb(hex_farbe: str) -> tuple[float, float, float]:
     hex_farbe = hex_farbe.lstrip("#")
     return tuple(int(hex_farbe[i:i + 2], 16) for i in (0, 2, 4))

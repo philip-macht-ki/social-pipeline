@@ -29,6 +29,7 @@ SCHRITTE = [
     ("fassungen", "video", "befehl_fassungen", False),
     ("texte", "texte", "befehl", False),
     ("bilder", "stile", "befehl", False),
+    ("kurzstuecke", "kurzstuecke", "befehl", False),
     ("planen", "plan", "befehl_planen", True),
     ("posten", "posten", "befehl", True),
     ("vorrat", "betrieb", "befehl_vorrat", True),

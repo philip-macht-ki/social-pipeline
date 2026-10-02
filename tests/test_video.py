@@ -216,6 +216,18 @@ def test_neue_zeit_bildet_quellzeit_auf_geschnittene_zeit_ab():
     assert video._neue_zeit(1.5, segmente) is None  # herausgeschnitten
 
 
+def test_korrektur_blendet_alle_woerter_beider_seiten_aus():
+    karte = {"art": "korrektur", "alt": "alter Plan", "y_text": "neuer Ablauf"}
+    assert video._kartenwoerter(karte) == ["alter", "Plan", "neuer", "Ablauf"]
+
+
+def test_plattformstil_faellt_auf_klar_zurueck(repo):
+    rezept = {"stil": {"reel": "titelband"}}
+    assert video._plattform_stil(rezept, "tiktok", "titelband") == "klar"
+    assert rezept["stil"]["tiktok"] == "klar"
+    assert video._plattform_stil(rezept, "youtube", "titelband") == "titelband"
+
+
 def test_ziel_stuecke_loest_take_namen_auf(repo):
     take = repo / "arbeit" / "beispiel"
     take.mkdir(parents=True, exist_ok=True)
@@ -243,6 +255,21 @@ def test_fassungen_veraltet_nach_neuem_rohschnitt(repo):
         os.utime(ordner / n, ns=(1_000_000_000_000_000_000,) * 2)
     assert video.fassungen_stueck("x-01").status == "nichts"
     os.utime(ordner / "roh.mp4", ns=(3_000_000_000_000_000_000,) * 2)
+    assert video.fassungen_stueck("x-01").status != "nichts"
+
+
+def test_fassungen_veraltet_nach_wortanfangskorrektur(repo):
+    """Eine geänderte Zeitachse erzwingt neue Untertitel-Fassungen."""
+    import os
+    ordner = repo / "ausgabe" / "x-01"
+    ordner.mkdir(parents=True)
+    for name in ("roh.mp4", "instagram.mp4", "tiktok.mp4", "cover.jpg"):
+        (ordner / name).write_bytes(b"x")
+    (ordner / "zeitachse.json").write_text('{"dauer_s": 1}', encoding="utf-8")
+    for name in ("instagram.mp4", "tiktok.mp4", "cover.jpg"):
+        os.utime(ordner / name, ns=(2_000_000_000_000_000_000,) * 2)
+    os.utime(ordner / "roh.mp4", ns=(1_000_000_000_000_000_000,) * 2)
+    os.utime(ordner / "zeitachse.json", ns=(3_000_000_000_000_000_000,) * 2)
     assert video.fassungen_stueck("x-01").status != "nichts"
 
 

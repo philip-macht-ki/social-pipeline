@@ -47,6 +47,14 @@ def test_unbesetzbarer_slot_stoppt_weitere_slots_nicht(repo):
 def test_threads_bekommt_keine_reels(repo):
     cfg={'tagesdeckel':9,'mindestabstand_minuten':0,'nachtruhe':['00:00','00:00']};assert not plan._erlaubt(_k('threads','reel'),plan._dt(_zeit(120)),[],cfg)
 
+
+def test_einbild_karussell_wird_nicht_geplant(repo):
+    d = repo / "ausgabe" / "bilder" / "eins"
+    d.mkdir(parents=True)
+    (d / "bild.json").write_text(json.dumps({"id": "eins", "plattform": "instagram", "art": "karussell",
+                                               "status": "fertig", "dateien": ["01.jpg"], "texte": {}}))
+    assert all(kandidat["quelle"] != "eins" for kandidat in plan._kandidaten())
+
 def test_verpasst_und_fehler_werden_neu_eingeplant(repo):
     # Verpasste/gescheiterte Zeilen (posten.py setzt diesen Status bei
     # Überfälligkeit bzw. einem Sendefehler) dürfen den nächsten `planen`-Lauf
@@ -82,3 +90,11 @@ def test_eine_aufnahme_fuellt_trotzdem_mehrere_plaetze(repo):
     plan.befehl_planen(argparse.Namespace(tage=3))
     es = [e for e in json.loads((repo / 'arbeit/plan.json').read_text())['eintraege'] if e['kanal'] == 'instagram']
     assert len(es) == 3, es
+
+
+def test_instagram_kein_bild_direkt_vor_einem_bild(repo):
+    cfg = {'tagesdeckel': 9, 'mindestabstand_minuten': 0, 'nachtruhe': ['00:00', '00:00']}
+    z = plan._dt(_zeit(120))
+    danach = _e(_k(art='karussell', take='alt'), z + timedelta(minutes=1))
+    assert not plan._erlaubt(_k(art='bild'), z, [danach], cfg)
+    assert plan._erlaubt(_k(art='reel'), z, [danach], cfg)

@@ -3,18 +3,18 @@
 # so bleibt nachvollziehbar, warum er fehlt.
 
 [instagram]
-reel = ["klar", "titelband", "stichworte"]
+reel = ["klar", "titelband", "stichworte", "einwort", "schwarzbild"]
 bild = ["zitat_standbild", "zahl", "einwand", "vorher_nachher", "raster", "notiz"]
-karussell = ["schritte", "kette", "woche_hell"]
+karussell = ["schritte", "kette", "woche_hell", "foto", "handschrift_liste", "rasterposter"]
 gesperrt = []
 
 [tiktok]
-video = ["klar", "stichworte"]
+video = ["klar", "stichworte", "einwort", "schwarzbild"]
 fotobeitrag = ["foto_schritte", "foto_zitat"]
 gesperrt = []
 
 [youtube]
-short = ["klar", "titelband"]
+short = ["klar", "titelband", "einwort", "schwarzbild"]
 
 [pinterest]
 pin = ["spickzettel", "szene", "notizbuch", "editorial", "typomix", "tabelle", "toolraster", "statistik"]

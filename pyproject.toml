@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = ["pillow>=10", "numpy>=1.26", "requests>=2.31", "tomli-w>=1.0"]
 
 [project.optional-dependencies]
-mac = ["mlx-whisper>=0.4"]
+mac = ["mlx-whisper>=0.4", "pyobjc-framework-Vision>=10", "pyobjc-framework-Quartz>=10"]
 whisper = ["faster-whisper>=1.0"]
 youtube = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
 dev = ["pytest>=8"]

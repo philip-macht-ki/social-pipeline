@@ -1,10 +1,92 @@
-from pipeline import rohmaterial, transkript, zerlegen, hook
+import os
+import time
+from pathlib import Path
+
+from pipeline import hook, rohmaterial, transkript, zerlegen
 
 
 def test_eingang_akzeptiert_grosse_endung(repo):
     (repo / "eingang" / "Mein Video.MOV").write_bytes(b"x")
     assert rohmaterial.eingang()[0].status == "ok"
     assert (repo / "arbeit" / "mein-video" / "quelle.mov").exists()
+
+
+def test_weiterer_eingang_uebernimmt_erst_nach_zweiter_stabiler_beobachtung(repo, tmp_path, monkeypatch):
+    quelle = tmp_path / "drive"
+    quelle.mkdir()
+    video = quelle / "Mein Video.MOV"
+    video.write_bytes(b"video")
+    konfig = repo / "konfig" / "pipeline.toml"
+    konfig.write_text(konfig.read_text().replace("weitere_ordner = []", f'weitere_ordner = ["{quelle}"]'))
+
+    zeit = [1_000.0]
+    monkeypatch.setattr(rohmaterial.time, "time", lambda: zeit[0])
+    assert video.exists()
+    rohmaterial.eingang()
+    zeit[0] += 180
+    ergebnisse = rohmaterial.eingang()
+
+    assert any(e.status == "ok" for e in ergebnisse)
+    assert (quelle / "übernommen" / "Mein Video.MOV").read_bytes() == b"video"
+    assert not video.exists()
+    assert (repo / "arbeit" / "mein-video" / "quelle.mov").exists()
+
+
+def test_weiterer_eingang_laesst_zu_junges_video_liegen(repo, tmp_path):
+    quelle = tmp_path / "drive"
+    quelle.mkdir()
+    video = quelle / "neu.mp4"
+    video.write_bytes(b"video")
+    konfig = repo / "konfig" / "pipeline.toml"
+    konfig.write_text(konfig.read_text().replace("weitere_ordner = []", f'weitere_ordner = ["{quelle}"]'))
+
+    rohmaterial.eingang()
+
+    assert video.exists()
+    assert not (quelle / "übernommen").exists()
+
+
+def test_weiterer_eingang_beginnt_bei_geaenderter_groesse_von_vorn(repo, tmp_path, monkeypatch):
+    quelle = tmp_path / "drive"
+    quelle.mkdir()
+    video = quelle / "neu.mp4"
+    video.write_bytes(b"video")
+    konfig = repo / "konfig" / "pipeline.toml"
+    konfig.write_text(konfig.read_text().replace("weitere_ordner = []", f'weitere_ordner = ["{quelle}"]'))
+    zeit = [1_000.0]
+    monkeypatch.setattr(rohmaterial.time, "time", lambda: zeit[0])
+    rohmaterial.eingang()
+    zeit[0] += 181
+    video.write_bytes(b"video ist weiter gewachsen")
+    rohmaterial.eingang()
+    assert video.exists()
+    zeit[0] += 181
+    rohmaterial.eingang()
+    assert (quelle / "übernommen" / "neu.mp4").exists()
+
+
+def test_weiterer_eingang_verwirft_falsche_kopiegroesse(repo, tmp_path, monkeypatch):
+    quelle = tmp_path / "drive"
+    quelle.mkdir()
+    video = quelle / "alt.mp4"
+    video.write_bytes(b"video")
+    konfig = repo / "konfig" / "pipeline.toml"
+    konfig.write_text(konfig.read_text().replace("weitere_ordner = []", f'weitere_ordner = ["{quelle}"]'))
+
+    def zu_klein(_: str, ziel: str):
+        Path(ziel).write_bytes(b"x")
+
+    zeit = [1_000.0]
+    monkeypatch.setattr(rohmaterial.time, "time", lambda: zeit[0])
+    rohmaterial.eingang()
+    zeit[0] += 180
+    monkeypatch.setattr(rohmaterial.shutil, "copyfile", zu_klein)
+    ergebnisse = rohmaterial.eingang()
+
+    assert any(e.status == "befund" for e in ergebnisse)
+    assert video.exists()
+    assert not (quelle / "übernommen").exists()
+    assert not list((repo / "eingang").glob("*.teil"))
 
 
 def test_saetze_an_pause_und_zeichen():

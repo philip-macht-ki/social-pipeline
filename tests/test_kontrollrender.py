@@ -10,11 +10,16 @@ editorial/typomix/tabelle nur 3 bis 6 der 7 Punkte zeichnen).
 """
 from __future__ import annotations
 
+import os
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
 
 from pipeline.kern import ROOT
+from pipeline import bausteine
 from pipeline.stile import instagram, pinterest, threads, tiktok
 from pipeline.stile.pinterest import HOECHSTZAHL
 
@@ -52,6 +57,7 @@ BEISPIELDATEN = {
     "text": "7",
     "zahl": 7,
     "handle": "@deinhandle",
+    "unter": "Neun kurze Gedanken für deinen Alltag",
 }
 
 # Pinterest-Titel je Stil, passend zur Höchstzahl gezeichneter Punkte (siehe Docstring).
@@ -71,14 +77,37 @@ def _speichern(im, ziel: Path) -> None:
     im.convert("RGB").save(ziel, "JPEG", quality=90, subsampling=0)
 
 
+def _beispielquelle() -> tuple[Path, float, tempfile.TemporaryDirectory]:
+    """Erzeugt die Kontrollquelle über dieselben beiden Befehle wie ein Mitglied.
+
+    Der temporäre Pipeline-Ordner verhindert, dass die Kontrolle eigene
+    Aufnahmen oder Arbeitsergebnisse im Repository verändert.
+    """
+    temporaer = tempfile.TemporaryDirectory()
+    wurzel = Path(temporaer.name)
+    shutil.copytree(ROOT / "konfig", wurzel / "konfig")
+    umgebung = {**os.environ, "PIPELINE_ROOT": str(wurzel)}
+    for befehl in (["uv", "run", "pipeline", "beispiel"], ["uv", "run", "pipeline", "eingang"]):
+        subprocess.run(befehl, cwd=ROOT, env=umgebung, check=True, capture_output=True, text=True)
+    quelle = next((wurzel / "arbeit" / "beispiel").glob("quelle.*"))
+    from pipeline.kern import dauer
+    return quelle, dauer(quelle), temporaer
+
+
 @pytest.mark.langsam
 def test_kontrollrender_aller_stile():
     # Frühwarnung, falls ein neuer Pinterest-Stil mit Höchstzahl dazukommt, aber
     # PINTEREST_TITEL oben nicht mitgepflegt wurde.
     assert set(HOECHSTZAHL) <= set(PINTEREST_TITEL)
 
-    zielordner = ROOT / "ausgabe" / "_kontrolle" / "stile"
+    zielordner = ROOT / "_kontrolle" / "stile"
     zielordner.mkdir(parents=True, exist_ok=True)
+
+    bausteinordner = ROOT / "_kontrolle" / "bausteine"
+    bausteinordner.mkdir(parents=True, exist_ok=True)
+    handy = bausteine._karte({"art": "handyrahmen", "von": 0, "bis": 2,
+                               "pos_x": 60, "y": 1230}, links=60, rechts=900, unten=520)
+    _speichern(handy, bausteinordner / "tiktok-handyrahmen.jpg")
 
     erwartete_dateien = []
     for stil in ["zitat_standbild", "zahl", "einwand", "vorher_nachher", "raster", "notiz"]:
@@ -91,7 +120,32 @@ def test_kontrollrender_aller_stile():
     for stil in ["schritte", "kette", "woche_hell"]:
         folien, befund = instagram.karussell(stil, BEISPIELDATEN, 6)
         assert not befund, (stil, befund)
-        for nummer, folie in enumerate(folien[:2], 1):
+        for nummer, folie in enumerate(folien, 1):
+            dateiname = f"instagram-{stil}-{nummer:02d}.jpg"
+            _speichern(folie, zielordner / dateiname)
+            erwartete_dateien.append(dateiname)
+
+    quelle, dauer_s, temporaer = _beispielquelle()
+    neue_karussells = {
+        "foto": {**BEISPIELDATEN, "titel": "Erste Zeile\nzweite Zeile", "quelle": quelle, "dauer_s": dauer_s,
+                 "punkte": [
+                     "Plane den ersten Schritt am Morgen und halte ihn klein, damit du ohne Umweg beginnen kannst.",
+                     "Sortiere danach nur die Informationen, die für diese eine Entscheidung wirklich wichtig sind.",
+                     "Schreibe den nächsten Termin direkt auf, bevor die Aufgabe wieder zwischen anderen Dingen verschwindet.",
+                     "Prüfe am Abend kurz, was funktioniert hat, und notiere eine konkrete Änderung für morgen.",
+                 ]},
+        "handschrift_liste": {**BEISPIELDATEN, "titel": "Drei Zeilen\nmit viel Luft\nfür den Anfang",
+                                "frage": "Drei Zeilen\nmit viel Luft\nfür den Schluss",
+                                "punkte": BEISPIELDATEN["saetze"][:5]},
+        "rasterposter": {**BEISPIELDATEN, "titel": "KLARE SCHRITTE", "punkte": [
+            {"stichwort": f"Punkt {nummer}", "satz": "Ein kurzer Satz für den Alltag."}
+            for nummer in range(1, 10)
+        ]},
+    }
+    for stil, daten in neue_karussells.items():
+        folien, befund = instagram.karussell(stil, daten, 6)
+        assert not befund, (stil, befund)
+        for nummer, folie in enumerate(folien, 1):
             dateiname = f"instagram-{stil}-{nummer:02d}.jpg"
             _speichern(folie, zielordner / dateiname)
             erwartete_dateien.append(dateiname)
@@ -119,3 +173,4 @@ def test_kontrollrender_aller_stile():
 
     for dateiname in erwartete_dateien:
         assert (zielordner / dateiname).exists()
+    temporaer.cleanup()

@@ -16,9 +16,19 @@ sprache = "de"
 zeitzone = "Europe/Berlin"
 gesamtzeit_minuten = 50
 
+[ki]
+# Monatlicher Hoechstbetrag fuer kostenpflichtige KI-Videos. LTX bleibt lokal und kostenlos.
+deckel_eur = 20
+# Eine kurze KI-Szene im Reel einsetzen. Erst bewusst einschalten, wenn LTX oder OpenRouter bereit ist.
+einblendung = false
+# Ordner der lokalen Installation von ltx-2-mlx. Leer lassen, wenn LTX nicht installiert ist.
+ltx_ordner = ""
+
 [schnitt]
 min_laenge = 30
 max_laenge = 170
+# Zieht Wortanfänge nach einer längeren Sprechpause am tatsächlichen Toneinsatz nach.
+wortanfang_nachziehen = true
 pausen_ab = 0.9
 entspiegeln = false
 belichtung = true
@@ -46,7 +56,16 @@ pauschal = false
 [plan]
 tage = 7
 
+[kurzstuecke]
+# Stille Zusatzreels je Aufnahme einzeln ein- oder ausschalten.
+lesereel = true
+uebermalt = true
+
 [ordner]
 eingang = "eingang"
 arbeit = "arbeit"
 ausgabe = "ausgabe"
+
+[eingang]
+# Weitere Eingangsordner, zum Beispiel ein Ordner von Google Drive für Desktop. ~ ist erlaubt.
+weitere_ordner = []

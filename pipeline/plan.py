@@ -80,6 +80,8 @@ def _kandidaten() -> list[dict]:
         kanal, art = d.get("plattform"), d.get("art")
         if not kanal or kanal not in konfig("kanaele"):
             continue
+        if art == "karussell" and len(d.get("dateien", [])) < 2:
+            continue
         text = d.get("texte", {}).get(kanal, {})
         raus.append({
             "quelle": d.get("id", f.parent.name),
@@ -142,6 +144,10 @@ def _erlaubt(kandidat: dict, zeit: datetime, eintraege: list[dict], cfg: dict, t
             return False
     if kandidat["kanal"] == "instagram" and _art(kandidat["art"]) in ("bild", "karussell"):
         if vorher and _art(vorher[-1]["art"]) in ("bild", "karussell"):
+            return False
+        # Auch nach hinten prüfen: Beim Vorziehen kann ein Bild direkt vor ein
+        # schon geplantes Bild rutschen.
+        if nachher and _art(nachher[0]["art"]) in ("bild", "karussell"):
             return False
     return True
 

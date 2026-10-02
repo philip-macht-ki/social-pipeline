@@ -14,6 +14,11 @@ Du musst dafür nicht programmieren können. Alles, was Claude für dich
 
 ## Was das kostet
 
+Die Pipeline zählt kostenpflichtige Aufträge zusätzlich in einem monatlichen
+Deckel. Den Betrag stellst du unter `[ki] deckel_eur` in `konfig/pipeline.toml`
+ein. `uv run pipeline ki-budget` zeigt die Buchungen. Bei erreichtem Deckel
+bleibt nur das lokale, kostenlose LTX erlaubt.
+
 OpenRouter rechnet in Dollar ab, deshalb unten beide Angaben; die Euro-Beträge
 sind zum Kurs vom 30.09.2026 (1 € = 1,1355 $) gerechnet und schwanken mit dem
 Wechselkurs leicht. Ein ganzes Umbau-Reel mit mehreren Abschnitten kostet
@@ -183,6 +188,8 @@ Storyboard, danach setzt Seedance es als Video um.
    Mit einem `-fast`-Modell setzt `storyboard_video.py` `--dauer 4` und
    `--size 720x1280` auch automatisch, wenn du sie weglässt; ausdrücklich
    angegebene Werte haben trotzdem Vorrang.
+   Für eine reine Text-zu-Video-Szene kann ein Programmaufruf `erzeugen(None, ziel,
+   prompt, ...)` nutzen. Dann wird kein Bild und keine Aufnahme an Seedance gesendet.
 3. **Endkarte und Schritt-Einblendungen** baust du am besten als HTML und
    rendertst sie mit einem Headless-Browser, dann stimmen Schrift und
    Abstand. Bildschirmschrift kommt in Seedance nur angedeutet, deshalb

@@ -39,6 +39,11 @@ nur, was freigegeben ist.
 
 ## Was passiert
 
+In `konfig/pipeline.toml` kann unter `[eingang]` mit `weitere_ordner` ein
+zusätzlicher Ordner stehen, etwa von Google Drive für Desktop. `pipeline eingang`
+übernimmt daraus nur Videos, deren Größe und Änderungszeit in zwei Läufen über
+mindestens drei Minuten unverändert beobachtet wurden.
+
 | Schritt | Befehl | Wer entscheidet |
 |---|---|---|
 | Neue Aufnahmen übernehmen | `pipeline eingang` | Code |
@@ -49,11 +54,13 @@ nur, was freigegeben ist.
 | Fassung je Plattform mit Untertiteln | `pipeline fassungen` | Code |
 | Texte je Plattform | `pipeline texte` | Modell, Code prüft Grenzen |
 | Bilder, Karussells, Pins, Threads | `pipeline bilder` | Modell für Text, Code für Bild |
+| Stille Lese-Reels und übermalte Sätze | `pipeline kurzstuecke [take …]` | Modell für Inhalt, Code für Bild und Schnitt |
 | Auf Sendeplätze verteilen | `pipeline planen` | Code |
 | Ansehen und freigeben | `pipeline zeigen`, `pipeline freigeben` | du |
 | Veröffentlichen | `pipeline posten --echt` | Code |
 | Lücken melden | `pipeline vorrat`, `pipeline status` | Code |
 | Verbrauch ansehen | `pipeline verbrauch` | Code |
+| KI-Monatsbudget ansehen | `pipeline ki-budget` | Code |
 | Alles in einem Lauf | `pipeline tag` | |
 | Automatisch alle 20 Minuten | `pipeline zeitplan einrichten` | |
 
@@ -61,15 +68,28 @@ nur, was freigegeben ist.
 
 | Plattform | Stile |
 |---|---|
-| Instagram Reel | `klar`, `titelband`, `stichworte` |
+| Instagram Reel | `klar`, `titelband`, `stichworte`, `einwort`, `schwarzbild` |
 | Instagram Bild | `zitat_standbild`, `zahl`, `einwand`, `vorher_nachher`, `raster`, `notiz` |
-| Instagram Karussell | `schritte`, `kette`, `woche_hell` |
+| Instagram Karussell | `schritte`, `kette`, `woche_hell`, `foto`, `handschrift_liste`, `rasterposter` |
 | TikTok | Video wie Reel mit höheren Untertiteln, Fotobeitrag `foto_schritte`, `foto_zitat` |
 | YouTube Short | wie Reel, eigener Titel, nur bis 179 Sekunden |
 | Pinterest | `spickzettel`, `szene`, `notizbuch`, `editorial`, `typomix`, `tabelle`, `toolraster`, `statistik` |
 | Threads | `merksatz`, `einwand`, `zahl`, `frage`, `kette`, `bild_zeile` |
 
 An und aus in `konfig/stile.toml`.
+
+Die beiden Zusatzstücke schaltest du in `konfig/pipeline.toml` unter
+`[kurzstuecke]` einzeln mit `lesereel` und `uebermalt` ein oder aus. Ohne Ziel
+baut `pipeline kurzstuecke` sie für Takes mit fertigen normalen Stücken. Der
+Tageslauf erledigt das nach `bilder` und vor dem zweiten `planen`.
+
+Das Lese-Reel nimmt die Titel und Aussagen aus den Stückrezepten der Aufnahme
+auf. Beide Zusatzstücke bekommen eine kurze Caption aus demselben Modellurteil;
+sie endet mit einer Frage.
+
+Die Auslöser für Haken, Korrekturen und Markenlogos stehen in
+`konfig/bausteine.toml`. Gesichtserkennung ist optional und kommt mit
+`uv sync --extra mac`.
 
 ## Veröffentlichen
 
@@ -119,6 +139,11 @@ bleiben echt. Dasselbe Werkzeug kann auch Clips ganz ohne Kamera erzeugen,
 aus einem gemalten Storyboard. Beides erklärt `umbau/README.md`, dazu Kosten
 in Euro je Sekunde, Modellwahl und die Fallen aus dem echten Betrieb. Im Kurs
 ist das Modul S7 „KI-Video: umbauen und erzeugen".
+
+Unter `[ki]` in `konfig/pipeline.toml` steht der Monatsdeckel für kostenpflichtige
+KI-Videos. `einblendung = false` ist der sichere Standard. Wenn sie eingeschaltet
+ist, setzt die Pipeline höchstens eine kurze Szene je Reel ein und fällt bei
+fehlendem Budget oder Modell immer auf das normale Rohvideo zurück.
 
 ## Lizenz
 

@@ -6,10 +6,15 @@ echte gerenderte Größen und Farben, nie geschätzte Werte.
 """
 from __future__ import annotations
 
+from types import SimpleNamespace
+
+from PIL import Image
+
 from pipeline import stile as stile_paket
 from pipeline.stile import pinterest_auswahl
 from pipeline.stile import pinterest, instagram, tiktok, threads
-from pipeline.stile.gemeinsam import MINDESTKONTRAST, kontrast
+from pipeline.stile.gemeinsam import MINDESTKONTRAST, kontrast, linienpositionen
+from pipeline.schrift import groesste_passende
 from pipeline.kern import konfig
 
 DATEN = {
@@ -55,6 +60,81 @@ def test_instagram_karussells_rendern_lesbar(repo):
         for folie in folien:
             assert folie.size == (1080, 1350)
             _pruefe_boxen(folie, 1080, 1350)
+
+
+def test_neue_instagram_karussells_rendern_lesbar(repo):
+    neue_daten = {
+        **DATEN,
+        "titel": "Drei Zeilen\nmit viel Luft\nfür den Anfang",
+        "frage": "Drei Zeilen\nmit viel Luft\nfür den Schluss",
+        "unter": "Neun kurze Gedanken für den Alltag",
+        "punkte": ["Ein vollständiger kurzer Satz für den Alltag."] * 5,
+    }
+    foto, befund = instagram.karussell("foto", {**neue_daten, "titel": "Erste Zeile\nzweite Zeile",
+                                                  "punkte": neue_daten["punkte"][:4]})
+    hand, hand_befund = instagram.karussell("handschrift_liste", neue_daten)
+    raster, raster_befund = instagram.karussell("rasterposter", {**neue_daten, "titel": "KLARE SCHRITTE", "punkte": [
+        {"stichwort": f"Punkt {index}", "satz": "Ein kurzer Satz für den Alltag."} for index in range(9)
+    ]})
+    for folien, grund in [(foto, befund), (hand, hand_befund), (raster, raster_befund)]:
+        assert folien and not grund, grund
+        for folie in folien:
+            assert folie.size == (1080, 1350)
+            _pruefe_boxen(folie, 1080, 1350)
+    assert len(foto) == 6
+    assert len(raster) == 2
+
+
+def test_handschrift_grundlinien_liegen_auf_dem_papierraster(repo):
+    daten = {**DATEN, "titel": "Drei Zeilen\nmit viel Luft\nfür den Anfang",
+             "frage": "Drei Zeilen\nmit viel Luft\nfür den Schluss",
+             "punkte": ["Ein vollständiger kurzer Satz für den Alltag."] * 5}
+    folien, befund = instagram.karussell("handschrift_liste", daten)
+    assert not befund
+    papierlinien = linienpositionen(1350)
+    for folie in folien:
+        grundlinien = folie.handschrift_grundlinien
+        assert grundlinien
+        assert all(min(abs(grundlinie + 6 - papierlinie) for papierlinie in papierlinien) <= 1
+                   for grundlinie in grundlinien)
+        assert all(zweite - erste == 74 for erste, zweite in zip(grundlinien, grundlinien[1:]))
+
+
+def test_rasterposter_nutzt_die_groesste_passende_titelstufe(repo):
+    daten = {**DATEN, "titel": "KLARE SCHRITTE", "punkte": [
+        {"stichwort": f"Punkt {index}", "satz": "Ein kurzer Satz für den Alltag."} for index in range(9)
+    ]}
+    folien, befund = instagram.karussell("rasterposter", daten)
+    assert not befund
+    erwartet, _ = groesste_passende(daten["titel"], "block", [132, 120, 108, 96, 84, 72, 60, 48], 984, 2)
+    titelbox = next(box for box in folien[0].textboxen if box["rolle"] == "block")
+    assert titelbox["groesse"] == erwartet
+
+
+def test_neue_karussells_pruefen_ihre_festen_grenzen(repo):
+    folien, befund = instagram.karussell("foto", {**DATEN, "punkte": ["nur einer"]})
+    assert not folien and "vier" in befund
+    folien, befund = instagram.karussell("handschrift_liste", {**DATEN, "punkte": ["nur einer"] * 4})
+    assert not folien and "5 bis 8" in befund
+    folien, befund = instagram.karussell("rasterposter", {**DATEN, "punkte": []})
+    assert not folien and "neun" in befund
+
+
+def test_foto_standbilder_liegen_zwischen_zwolf_und_achtundachtzig_prozent(repo, monkeypatch):
+    quelle = repo / "arbeit" / "t1" / "quelle.mp4"
+    quelle.parent.mkdir(parents=True)
+    quelle.touch()
+    zeiten = []
+
+    def ffmpeg_ersatz(befehl, capture_output):
+        zeiten.append(float(befehl[befehl.index("-ss") + 1]))
+        Image.new("RGB", (1080, 1350), "#555555").save(befehl[-1])
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(instagram.subprocess, "run", ffmpeg_ersatz)
+    bilder = instagram._standbilder_aus_aufnahme(quelle, 100)
+    assert len(bilder) == 6
+    assert zeiten == [12.0, 27.2, 42.4, 57.6, 72.8, 88.0]
 
 
 def test_tiktok_fotobeitraege_rendern_lesbar(repo):

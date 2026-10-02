@@ -37,12 +37,28 @@ arbeit/postlog.json            siehe unten
 arbeit/urteile.jsonl           jedes Modellurteil, eine Zeile je Aufruf
 arbeit/cache/urteile/<hash>.json   Zwischenspeicher, 7 Tage
 arbeit/logs/<datum>.log        Protokoll je Tag
+arbeit/ki_budget.json          KI-Buchungen des Monats und Deckelstatus
+arbeit/ki_rotation.json        Zähler für die Wahl der KI-Einblendung
+arbeit/eingang_beobachtet.json Größe, Änderungszeit und Beobachtungsbeginn je zusätzlicher Eingangsdatei
 ausgabe/<stueck_id>/           fertige Dateien je Stück, siehe unten
 ausgabe/bilder/<bild_id>/      fertige Bildbeiträge, siehe unten
 medien/hintergruende/          eigene Fotos für Pinterest-Stile mit Foto (optional)
 ```
 
 `stueck_id` = `<take>-<nn>`, z. B. `beispiel-01`.
+Zusatzstücke heißen `<take>-lese` und `<take>-uebermalt`; ihr `stueck.json`
+trägt zusätzlich `"stil": "lesereel"` beziehungsweise `"uebermalt"`.
+Das Lese-Reel erhält sein Thema aus `titel` und `aussage` der Rezepte eines
+Takes. Beide Zusatzstücke lassen im selben Modellurteil eine kurze Caption
+erzeugen, die mit einer Frage endet.
+
+Weitere Eingangsordner stehen als `weitere_ordner` unter `[eingang]` in
+`konfig/pipeline.toml`. Der Eingang übernimmt daraus nur fertige Video-Dateien,
+deren Größe und Änderungszeit mindestens 180 Sekunden unverändert beobachtet
+wurden. Er kopiert sie erst mit einer Teil-Datei nach `eingang/` und verschiebt das Original
+anschließend nach `übernommen/` im Quellordner. In `zeitachse.json` steht nach
+dem Rohschnitt zusätzlich `wortanfang_korrigiert`, die Zahl der am Toneinsatz
+nachgezogenen Wortanfänge.
 
 ## rezept.json (ein Stück aus einem Take)
 
@@ -53,7 +69,7 @@ medien/hintergruende/          eigene Fotos für Pinterest-Stile mit Foto (optio
   "titel": "Kurzer Titel, zwei Zeilen erlaubt mit \n",
   "aussage": "Ein Satz, was das Stück sagt",
   "hook": {"von_satz": 5, "punkte": 8, "einstieg_punkte": 3, "grund": "…"} ,
-  "stil": {"reel": "klar"},
+  "stil": {"reel": "klar", "tiktok": "klar", "youtube": "klar"},
   "schluss": "Text der Schlusskarte",
   "status": "zerlegt | gebaut | fertig | befund",
   "befunde": ["…"]
@@ -66,6 +82,7 @@ medien/hintergruende/          eigene Fotos für Pinterest-Stile mit Foto (optio
 
 ```
 roh.mp4            Rohschnitt 1080x1920, 30 fps, Ton normalisiert, ohne Schrift
+roh_ki.mp4         optional: Rohschnitt mit einer KI-Einblendung, Ton unverändert
 zeitachse.json     {"segmente": [[s,e],…] (Quellzeit), "woerter": [{"w","s","e"}] (neue Zeit), "dauer_s"}
 instagram.mp4      Fassung mit Schrift-Ebene, ≤ 82 MB
 tiktok.mp4         Untertitel höher (TikTok-Leiste), H.264
@@ -106,15 +123,23 @@ Threads-Texte ohne Bild: `art: "text"`, `dateien: []`, Text in `texte.threads.te
 ## Stile
 
 Jede Plattform hat eigene Stile. Welche an sind, steht in `konfig/stile.toml`.
+`stil.tiktok` und `stil.youtube` halten den tatsächlich gebauten Stil fest. Ist
+der Instagram-Stil dort nicht erlaubt, steht dort `klar`; YouTube erhält dann
+eine eigene Fassung, sonst bleibt es die Kopie der Instagram-Fassung.
 
 | Plattform | Art | Stile |
 |---|---|---|
-| Instagram | Reel | `klar` (Tipp-Titel + Karaoke), `titelband` (festes Band oben), `stichworte` (Stichwort-Kacheln) |
+| Instagram | Reel | `klar` (Tipp-Titel + Karaoke), `titelband` (festes Band oben), `stichworte` (Stichwort-Kacheln), `einwort`, `schwarzbild` |
 | Instagram | Bild 1080x1350 | `zitat_standbild`, `zahl`, `einwand`, `vorher_nachher`, `raster`, `notiz` |
-| Instagram | Karussell 1080x1350 | `schritte`, `kette`, `woche_hell` |
+| Instagram | Karussell 1080x1350 | `schritte`, `kette`, `woche_hell`, `foto`, `handschrift_liste`, `rasterposter` |
 | TikTok | Video | wie Reel, eigene Untertitelhöhe |
 | TikTok | Fotobeitrag 1080x1920 | `foto_schritte`, `foto_zitat` |
 | YouTube | Short | wie Reel, eigener Titel, nur ≤ 179 s |
+
+Bei `einwort` und `schwarzbild` ergänzt der Bau `bausteine` im Rezept. Die
+sortierte Liste enthält nur tatsächlich gesetzte Karten sowie `wortstil_<name>`
+und gegebenenfalls `zoom_punch`. `gesicht.json` im Ausgabeordner enthält die
+zwischengespeicherten Gesichtszonen.
 | Pinterest | Pin 1000x1500 | `spickzettel`, `szene`, `notizbuch`, `editorial`, `typomix`, `tabelle`, `toolraster`, `statistik` |
 | Threads | Text | `merksatz`, `einwand`, `zahl`, `frage`, `kette`, `bild_zeile` |
 
@@ -148,5 +173,7 @@ Eine Liste. **Schlüssel ist immer (kanal, plan_id).** Wer liest, filtert nach K
 | `rohmaterial.py`, `transkript.py`, `zerlegen.py`, `hook.py`, `urteil.py`, `beispiel.py` | beispiel, eingang, transkript, zerlegen, hook |
 | `schnitt.py`, `video.py`, `ebenen.py`, `titelband.py` | bauen, fassungen |
 | `texte.py`, `stile/` | texte, bilder |
+| `kurzstuecke.py` | kurzstuecke |
 | `plan.py`, `posten/`, `betrieb.py` | planen, zeigen, freigeben, posten, vorrat, status, zeitplan, instagram-token, youtube-anmelden |
 | `cli.py`, `pruefen.py` | pruefen, tag |
+| `ki_einblendung.py`, `umbau/budget.py` | ki-budget |

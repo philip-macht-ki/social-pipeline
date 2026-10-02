@@ -36,6 +36,9 @@ FELDER = {
     "instagram/schritte": '{"titel": "Titel des Karussells", "punkte": ["4 bis 6 Folien, je ein Satz"], "frage": "Frage auf der letzten Folie"}',
     "instagram/kette": '{"titel": "Titel", "punkte": ["4 bis 6 Glieder einer Kette, je ein kurzer Satz"], "frage": "Frage am Ende"}',
     "instagram/woche_hell": '{"titel": "Titel", "punkte": ["4 bis 6 Folien"], "frage": "Frage", "quelle": "Primärquelle, die in der Aufnahme genannt wurde"}',
+    "instagram/foto": '{"titel": "Hook in zwei Zeilen", "punkte": ["genau 4 kurze Sätze aus der Aufnahme"], "frage": "Schluss in zwei Zeilen"}',
+    "instagram/handschrift_liste": '{"titel": "genau 3 kurze handgeschriebene Zeilen", "punkte": ["5 bis 8 vollständige kurze Sätze"], "frage": "genau 3 kurze handgeschriebene Zeilen"}',
+    "instagram/rasterposter": '{"titel": "Überschrift mit mindestens zwei Wörtern", "unter": "graue Kleinzeile", "punkte": [{"stichwort": "höchstens 16 Zeichen", "satz": "höchstens 46 Zeichen"}, "genau 9 Einträge"]}',
     "tiktok/foto_schritte": '{"titel": "kurzer Titel", "saetze": ["genau 3 Schritte, je ein kurzer Satz"]}',
     "tiktok/foto_zitat": '{"aussage": "ein Satz, fast wörtlich gesagt"}',
     "pinterest/spickzettel": '{"titel": "Titel mit der Zahl der Punkte", "unter": "kurzer Merksatz", "punkte": ["bis 7 kurze Punkte"]}',
@@ -123,6 +126,31 @@ def _pruefe(antwort, gewuenscht: list[tuple[str, str, str]]) -> str | None:
             return f"{e.get('plattform')}/{e.get('stil')}: Beitragstext fehlt."
         if e.get("plattform") == "threads" and len(str(e.get("felder", {}).get("text", ""))) > 500:
             return f"threads/{e.get('stil')}: über 500 Zeichen."
+        befund = _stilgrenzen(e)
+        if befund:
+            return befund
+    return None
+
+
+def _stilgrenzen(eintrag: dict) -> str | None:
+    """Prüft feste Formen der neuen Karussells vor dem Rendern."""
+    if eintrag.get("plattform") != "instagram":
+        return None
+    stil = eintrag.get("stil")
+    felder = eintrag.get("felder") or {}
+    punkte = felder.get("punkte") or []
+    if stil == "foto" and len(punkte) != 4:
+        return "instagram/foto: braucht genau vier Sätze."
+    if stil == "handschrift_liste" and not 5 <= len(punkte) <= 8:
+        return "instagram/handschrift_liste: braucht 5 bis 8 Punkte."
+    if stil == "rasterposter":
+        if len(punkte) != 9:
+            return "instagram/rasterposter: braucht genau neun Einträge."
+        for punkt in punkte:
+            if not isinstance(punkt, dict):
+                return "instagram/rasterposter: jeder Eintrag braucht Stichwort und Satz."
+            if len(str(punkt.get("stichwort", ""))) > 16 or len(str(punkt.get("satz", ""))) > 46:
+                return "instagram/rasterposter: Stichwort oder Satz ist zu lang."
     return None
 
 

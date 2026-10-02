@@ -2,14 +2,23 @@
 oben = 270
 unten = 300
 rechts = 70
+# Links bleibt Text frei, rechts die Aktionsleiste für Herz, Kommentare und Teilen.
+links = 60
+aktionsleiste = 180
 [tiktok]
 oben = 270
 unten = 520
 rechts = 90
+# Links bleibt Text frei, rechts die Aktionsleiste für Herz, Kommentare und Teilen.
+links = 60
+aktionsleiste = 180
 [youtube]
 oben = 270
 unten = 300
 rechts = 70
+# Links bleibt Text frei, rechts die Aktionsleiste für Herz, Kommentare und Teilen.
+links = 60
+aktionsleiste = 180
 [pinterest]
 oben = 80
 unten = 80

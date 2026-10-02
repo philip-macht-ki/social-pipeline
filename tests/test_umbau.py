@@ -22,6 +22,29 @@ import hochladen  # noqa: E402
 import musik as musik_mod  # noqa: E402
 import openrouter as openrouter_mod  # noqa: E402
 import storyboard_video  # noqa: E402
+import umbauen  # noqa: E402
+
+
+def test_umbauen_ermittelt_ohne_dauer_die_eingabelaenge(monkeypatch, tmp_path):
+    aufrufe = []
+    monkeypatch.setattr(umbauen, "video_dauer", lambda _: 12.5)
+    monkeypatch.setattr(umbauen.budget, "darf", lambda art, sekunden: aufrufe.append(("darf", sekunden)) or True)
+    monkeypatch.setattr(umbauen.budget, "reservieren", lambda art, sekunden, ziel: aufrufe.append(("reservieren", sekunden)) or "id")
+    monkeypatch.setattr(umbauen.budget, "abschliessen", lambda *args: None)
+    monkeypatch.setattr(umbauen, "starten", lambda *args: {"id": "auftrag"})
+    monkeypatch.setattr(umbauen.orv, "warten", lambda _: {"usage": {"cost": 0.1}})
+    monkeypatch.setattr(umbauen.orv, "laden", lambda *args: None)
+
+    class Link:
+        def __enter__(self):
+            return "https://beispiel.invalid/video"
+
+        def __exit__(self, *args):
+            return False
+
+    monkeypatch.setattr(umbauen, "kurzlebiger_link", lambda _: Link())
+    umbauen.umbauen(str(tmp_path / "eingang.mp4"), str(tmp_path / "ziel.mp4"), "ruhiger Raum")
+    assert aufrufe == [("darf", 12.5), ("reservieren", 12.5)]
 
 
 # --- hochladen.py: Drive-Link-Umbau ---------------------------------------
@@ -334,6 +357,21 @@ def test_erzeugen_laesst_ausdrueckliche_werte_unangetastet(monkeypatch, tmp_path
 
     assert aufgezeichnet["body"]["duration"] == 8
     assert aufgezeichnet["body"]["size"] == "1080x1920"
+
+
+def test_erzeugen_ohne_bild_sendet_reines_text_zu_video(monkeypatch, tmp_path):
+    aufgezeichnet = {}
+
+    def fake_req(method, path, body=None):
+        aufgezeichnet["body"] = body
+        return 200, b'{"id": "abc"}'
+
+    monkeypatch.setattr(storyboard_video.orv, "req", fake_req)
+    monkeypatch.setattr(storyboard_video.orv, "warten", lambda *a, **k: {"usage": 0})
+    monkeypatch.setattr(storyboard_video.orv, "laden", lambda *a, **k: None)
+    storyboard_video.erzeugen(None, str(tmp_path / "ziel.mp4"), "empty room", budgetiert=True)
+    assert aufgezeichnet["body"]["prompt"] == "empty room"
+    assert "input_references" not in aufgezeichnet["body"]
 
 
 # --- Schlüssel wird nie in Ausgaben geschrieben ---------------------------

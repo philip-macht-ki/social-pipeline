@@ -3,6 +3,10 @@ eingang/
 ausgabe/
 .env
 __pycache__/
+social_pipeline.egg-info/
 *.mov
 *.mp4
 !beispiel/README.md
+
+medien/logos/
+_kontrolle/

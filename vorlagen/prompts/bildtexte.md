@@ -10,6 +10,9 @@ Regeln, ohne Ausnahme:
 - Was ein Titel verspricht, steht auf dem Bild: Steht eine Zahl im Titel, gibt
   es genau so viele Punkte.
 - Kurz. Bildtext wird gelesen, während der Daumen weiterwischt.
+- Für foto nur Sätze aus der Aufnahme. Für rasterposter sind es genau neun
+  Einträge mit "stichwort" (höchstens 16 Zeichen) und "satz" (höchstens 46
+  Zeichen). Für handschrift_liste sind es 5 bis 8 vollständige kurze Sätze.
 - Du-Form, gesprochene Sprache, keine Werbesprache, keine Gedankenstriche,
   keine Emojis, kein Aufruf zum Teilen.
 - Der Leser und seine Lage stehen im Mittelpunkt, nicht Werkzeuge oder die

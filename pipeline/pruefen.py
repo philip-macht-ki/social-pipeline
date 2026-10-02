@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import requests
 
@@ -147,6 +148,12 @@ def befehl(args) -> int:
         except Exception as e:
             zeile("ROT", f"Ordner {ordner} nicht beschreibbar: {e}",
                   f"Zugriffsrechte für {ordner}/ prüfen.")
+
+    for ordner in konfig("pipeline").get("eingang", {}).get("weitere_ordner", []):
+        p = Path(str(ordner)).expanduser()
+        erreichbar = p.is_dir() and os.access(p, os.R_OK | os.X_OK)
+        zeile("GRUEN" if erreichbar else "GELB", f"Eingangsordner {ordner}: {'ja' if erreichbar else 'nein'}",
+              "Pfad und Zugriffsrechte prüfen.")
 
     # Dieselben Schwellen wie im README, Abschnitt Voraussetzungen: 30 GB ist der Zielwert
     # für lange Rohvideos, 10 GB die harte Untergrenze.

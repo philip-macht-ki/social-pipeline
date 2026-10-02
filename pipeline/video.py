@@ -14,7 +14,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from . import ebenen, schnitt, titelband, urteil
+from . import bausteine, ebenen, einwort, gesicht, schnitt, titelband, urteil, wortspur
 from .kern import Ergebnis, konfig, lauf, lesen, log, pfad, schreiben, stueck_ordner, stuecke
 
 
@@ -186,6 +186,7 @@ def bauen_stueck(stueck_id: str, *, neu: bool = False) -> Ergebnis:
         "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(roh),
     ])
     schreiben(zeitachse_pfad, achse)
+    log(wortspur.nachziehen(ordner).meldung)
     return Ergebnis("ok", f"{len(segmente)} Segmente, {gesamt_dauer:.1f} s -> {roh.name}")
 
 
@@ -288,9 +289,42 @@ def _stil_waehlen(rezept: dict, rezept_pfad: Path) -> str:
     return gewaehlt
 
 
+def _plattform_stil(rezept: dict, plattform: str, instagram_stil: str) -> str:
+    """Wählt nur einen Stil, den die Zielplattform ausdrücklich erlaubt."""
+    art = "video" if plattform == "tiktok" else "short"
+    erlaubt = set(konfig("stile").get(plattform, {}).get(art, []))
+    stil = instagram_stil if instagram_stil in erlaubt else "klar"
+    rezept.setdefault("stil", {})[plattform] = stil
+    return stil
+
+
+def _kartenwoerter(karte: dict) -> list[str]:
+    """Wörter, die eine Karte in ihrer Zeit bereits lesbar zeigt."""
+    if karte.get("art") == "korrektur":
+        text = f"{karte.get('alt', '')} {karte.get('y_text', '')}"
+    else:
+        text = str(karte.get("wort", ""))
+    return [wort for wort in text.split() if wort]
+
+
+def _karten_fuer_rahmen(karten: list[dict], rahmen: dict, links: int, rechts: int,
+                         roh: Path | None) -> list[dict]:
+    """Hält Karten mit ihrer echten Höhe oberhalb der Plattformleiste."""
+    unten = int(rahmen["unten"])
+    out = []
+    for karte in karten:
+        hoehe = bausteine._lokal(karte, roh).height
+        maximum = 1920 - unten - hoehe
+        if maximum < 270:
+            continue
+        out.append({**karte, "y": max(270, min(int(karte.get("y", 900)), maximum))})
+    return out
+
+
 def _spuren_bauen(rezept: dict, rezept_pfad: Path, style: str, woerter_neu: list[dict],
                    saetze: list[dict], woerter_quelle: list[dict], segmente_quellzeit: list[list[float]],
-                   dauer: float, plattform: str, rahmen: dict, marke: dict
+                   dauer: float, plattform: str, rahmen: dict, marke: dict,
+                   karten: list[dict] | None = None, gesichter: list[dict] | None = None
                   ) -> list[list[tuple[float, float, Image.Image | None]]]:
     rp = rahmen[plattform]
     farben = marke.get("farben", {})
@@ -311,6 +345,24 @@ def _spuren_bauen(rezept: dict, rezept_pfad: Path, style: str, woerter_neu: list
                                      woerter_quelle, segmente_quellzeit)
         spuren.append(ebenen.kacheln_spur(kacheln, dauer, titel_bis=0.0, farben=farben))
         spuren.append(ebenen.karaoke_spur(woerter_neu, dauer, unten=rp["unten"], farben=farben_ut))
+    elif style in {"einwort", "schwarzbild"}:
+        links = int(rp.get("links", 60))
+        rechts = 1080 - int(rp.get("aktionsleiste", 180))
+        wortstil = (rezept.get("wortstil") or "klar")
+        spuren.append(ebenen.titel_spur(rezept.get("titel", ""), dauer, oben=rp["oben"], bis=4.8,
+                                        farbe="#f4f0e6"))
+        spuren.append(einwort.spur(woerter_neu, dauer, stil=wortstil, links=links, rechts=rechts,
+                                   akzentfarbe=farben.get("akzent", "#E8590C"), gesichter=gesichter,
+                                   auslassen=[{"wort": wort, "von": k["von"] - .2, "bis": k["bis"]}
+                                              for k in (karten or [])
+                                              if k["art"] in {"haken", "kreuz", "korrektur"}
+                                              for wort in _kartenwoerter(k)],
+                                   schwarz=style == "schwarzbild", zoom=bool(rezept.get("zoom_punch"))))
+        if karten:
+            karten_plattform = _karten_fuer_rahmen(karten, rp, links, rechts,
+                                                    rezept.get("_roh_fuer_bausteine"))
+            spuren.append(bausteine.spur(karten_plattform, dauer, links=links, rechts=rechts,
+                                         roh=rezept.get("_roh_fuer_bausteine"), unten=int(rp["unten"])))
     else:
         spuren.append(ebenen.karaoke_spur(woerter_neu, dauer, unten=rp["unten"], farben=farben_ut))
 
@@ -424,23 +476,67 @@ def fassungen_stueck(stueck_id: str, *, neu: bool = False) -> Ergebnis:
     marke = konfig("marke")
     rahmen = konfig("sicherheitsrahmen")
     style = _stil_waehlen(rezept, rezept_pfad)
+    # Das optionale Modul kann den Hintergrund ersetzen und ein Sperrfenster
+    # ins Rezept schreiben. Ohne Modul bleibt der Rohschnitt unverändert.
+    try:
+        from . import ki_einblendung
+    except ImportError:
+        ki_einblendung = None
+    grund = ki_einblendung.anwenden(stueck_id, rezept, rezept_pfad, roh, achse) if ki_einblendung else roh
+    wortstile = ["klar", "kontur", "pille"]
+    if style in {"einwort", "schwarzbild"}:
+        benutzt = {str((lesen(p / "rezept.json", {}) or {}).get("wortstil", "")) for p in stuecke()}
+        rezept["wortstil"] = min(wortstile, key=lambda x: (x in benutzt, wortstile.index(x)))
+        rezept["zoom_punch"] = rezept.get("nr", 1) % 2 == 0
+        gesichter = gesicht.laden(grund, ordner / "gesicht.json", dauer)
+        karten = [k for k in bausteine.finden(woerter_neu, rezept) if k["von"] < dauer]
+        for karte in karten:
+            karte["bis"] = min(karte["bis"], dauer)
+        karten = bausteine.platzieren(karten, gesichter,
+                                      links=int(rahmen["instagram"].get("links", 60)),
+                                      rechts=1080 - int(rahmen["instagram"].get("aktionsleiste", 180)))
+        karten = [karte for karte in karten if any(
+            bausteine._lokal(karte, roh).height <= 1920 - int(plattform["unten"]) - 270
+            for plattform in (rahmen["instagram"], rahmen["tiktok"], rahmen["youtube"])
+        )]
+        rezept["bausteine"] = [k["art"] for k in karten] + [f"wortstil_{rezept['wortstil']}"]
+        if rezept["zoom_punch"]:
+            rezept["bausteine"].append("zoom_punch")
+        schreiben(rezept_pfad, rezept)
+        # Nur für die Renderphase: kein rechnerbezogener Pfad im Rezept speichern.
+        rezept["_roh_fuer_bausteine"] = roh
+    else:
+        gesichter, karten = None, []
 
+    stil_tiktok = _plattform_stil(rezept, "tiktok", style)
+    stil_youtube = _plattform_stil(rezept, "youtube", style)
     spuren_standard = _spuren_bauen(rezept, rezept_pfad, style, woerter_neu, saetze, woerter_quelle,
-                                    achse["segmente"], dauer, "instagram", rahmen, marke)
-    spuren_tiktok = _spuren_bauen(rezept, rezept_pfad, style, woerter_neu, saetze, woerter_quelle,
-                                  achse["segmente"], dauer, "tiktok", rahmen, marke)
+                                    achse["segmente"], dauer, "instagram", rahmen, marke, karten, gesichter)
+    spuren_tiktok = _spuren_bauen(rezept, rezept_pfad, stil_tiktok, woerter_neu, saetze, woerter_quelle,
+                                  achse["segmente"], dauer, "tiktok", rahmen, marke, karten, gesichter)
+    spuren_youtube = None
+    if stil_youtube != style:
+        spuren_youtube = _spuren_bauen(rezept, rezept_pfad, stil_youtube, woerter_neu, saetze, woerter_quelle,
+                                       achse["segmente"], dauer, "youtube", rahmen, marke, karten, gesichter)
+    rezept.pop("_roh_fuer_bausteine", None)
+    schreiben(rezept_pfad, rezept)
 
     ebenen_ordner = ordner / "ebenen"
     liste_standard = ebenen.schreiben(ebenen_ordner / "standard", dauer, *spuren_standard)
     liste_tiktok = ebenen.schreiben(ebenen_ordner / "tiktok", dauer, *spuren_tiktok)
+    liste_youtube = (ebenen.schreiben(ebenen_ordner / "youtube", dauer, *spuren_youtube)
+                     if spuren_youtube is not None else None)
 
     basis_standard = ordner / "_basis_standard.mp4"
     basis_tiktok = ordner / "_basis_tiktok.mp4"
-    _overlay(roh, liste_standard, basis_standard)
-    _overlay(roh, liste_tiktok, basis_tiktok)
+    basis_youtube = ordner / "_basis_youtube.mp4"
+    _overlay(grund, liste_standard, basis_standard)
+    _overlay(grund, liste_tiktok, basis_tiktok)
+    if liste_youtube is not None:
+        _overlay(grund, liste_youtube, basis_youtube)
 
     letzter_frame_pfad = ordner / "_letzter_frame.jpg"
-    titelband.erstes_standbild(roh, max(0.0, dauer - 0.08), letzter_frame_pfad)
+    titelband.erstes_standbild(grund, max(0.0, dauer - 0.08), letzter_frame_pfad)
     schluss_text = _schluss_text(rezept, take)
     schluss_bild = ebenen.schlusskarte_bild(Image.open(letzter_frame_pfad), schluss_text,
                                             farbe=marke.get("farben", {}).get("hell", "#FBF5EC"))
@@ -457,19 +553,22 @@ def fassungen_stueck(stueck_id: str, *, neu: bool = False) -> Ergebnis:
 
     dateien = {"instagram": "instagram.mp4", "tiktok": "tiktok.mp4"}
     if dauer <= 179.0:
-        shutil.copyfile(voll_pfad, ordner / "youtube.mp4")
+        if liste_youtube is None:
+            shutil.copyfile(voll_pfad, ordner / "youtube.mp4")
+        else:
+            _mit_schlusskarte(basis_youtube, schluss_bild_pfad, ordner / "youtube.mp4")
         dateien["youtube"] = "youtube.mp4"
     else:
         befunde.append(f"zu lang für ein Short ({dauer:.0f} s > 179 s), kein youtube.mp4.")
 
     cover_ergebnis = titelband.cover(
-        roh, _cover_sekunde(rezept, saetze, achse["segmente"], dauer),
+        grund, _cover_sekunde(rezept, saetze, achse["segmente"], dauer),
         rezept.get("titel", ""), marke.get("wortmarke", "MARKE"), ordner / "cover.jpg",
     )
     if cover_ergebnis.meldung:
         befunde.append(cover_ergebnis.meldung)
 
-    for tmp in (basis_standard, basis_tiktok, voll_pfad, letzter_frame_pfad):
+    for tmp in (basis_standard, basis_tiktok, basis_youtube, voll_pfad, letzter_frame_pfad):
         tmp.unlink(missing_ok=True)
 
     stueck_json = {

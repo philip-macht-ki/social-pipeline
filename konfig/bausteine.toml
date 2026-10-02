@@ -1,0 +1,10 @@
+# Auslöser für kleine Einblendungen. Wörter klein schreiben, Mitglieder dürfen Listen ändern.
+[sticker]
+haken = ["kostenlos", "gratis", "spart", "lohnt", "schneller"]
+kreuz = ["teuer", "gefährlich"]
+
+[marken]
+claude = "claude.ai"
+chatgpt = "chatgpt.com"
+canva = "canva.com"
+notion = "notion.so"

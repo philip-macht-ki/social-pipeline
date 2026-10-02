@@ -59,14 +59,37 @@ def _felder_fuer_renderer(plattform: str, felder: dict, take: str, stil: str) ->
         daten.setdefault("text", f"{felder['zahl']} {felder.get('aussage', '')}")
     if plattform == "instagram" and stil == "zitat_standbild":
         daten["standbild"] = redaktion.standbild(take, redaktion.satz_nr(felder.get("satz_nr", "")))
+    if plattform == "instagram" and stil == "foto":
+        quelle = next(iter(sorted(pfad("arbeit", take).glob("quelle.*"))), None)
+        take_daten = lesen(pfad("arbeit", take, "take.json"), {}) or {}
+        daten["quelle"] = quelle
+        daten["dauer_s"] = take_daten.get("dauer_s")
+        daten["hintergruende"] = pfad("medien", "hintergruende")
     daten["handle"] = konfig("marke").get("handle", "")
     return daten
+
+
+NEUE_INSTAGRAM_KARUSSELLS = {"foto", "handschrift_liste", "rasterposter"}
+
+
+def _schritte_rueckfall(eintrag: dict) -> dict:
+    """Ersetzt einen nicht passenden neuen Stil einmal durch den robusten Stil schritte."""
+    felder = dict(eintrag.get("felder") or {})
+    punkte = felder.get("punkte") or []
+    if punkte and isinstance(punkte[0], dict):
+        punkte = [punkt.get("satz", "") for punkt in punkte]
+    felder["punkte"] = [str(punkt) for punkt in punkte[:6]] or ["Ein klarer nächster Schritt."]
+    felder.setdefault("titel", "Ein klarer Gedanke")
+    felder.setdefault("frage", "Was nimmst du daraus mit?")
+    return {**eintrag, "stil": "schritte", "felder": felder}
 
 
 def _rendern(plattform: str, art: str, stil: str, daten: dict):
     """(bilder, befund). bilder ist eine Liste, bei Einzelbildern mit einem Bild."""
     if art == "karussell":
         folien, befund = instagram.karussell(stil, daten, max(5, min(8, len(daten.get("punkte", [])) + 2)))
+        if folien and len(folien) < 2:
+            return [], "Karussell braucht mindestens zwei Folien."
         return (folien if folien and not befund else []), befund
     if plattform == "instagram":
         bild, befund = instagram.bild_stil(stil, daten)
@@ -207,9 +230,18 @@ def befehl(args) -> int:
                 continue
             ident = f"{take.name}-{plattform}-{stil}"
             if eintrag.get("passt_nicht"):
-                log(f"befund: {ident}: passt nicht zu diesem Material ({eintrag['passt_nicht']})")
-                continue
-            rechtschreib_befunde = _rechtschreibung_pruefen(ident, eintrag)
+                if plattform == "instagram" and art == "karussell" and stil in NEUE_INSTAGRAM_KARUSSELLS:
+                    grund = str(eintrag["passt_nicht"])
+                    eintrag = _schritte_rueckfall(eintrag)
+                    stil = "schritte"
+                    ident = f"{take.name}-{plattform}-{stil}"
+                    log(f"befund: {take.name}-instagram: {grund}; Rückfall auf schritte.")
+                    rechtschreib_befunde = [f"{grund}; Rückfall auf schritte."]
+                else:
+                    log(f"befund: {ident}: passt nicht zu diesem Material ({eintrag['passt_nicht']})")
+                    continue
+            else:
+                rechtschreib_befunde = _rechtschreibung_pruefen(ident, eintrag)
             felder = eintrag.get("felder", {}) or {}
             ordner = pfad("ausgabe", "bilder", ident)
             dateien: list[str] = []
