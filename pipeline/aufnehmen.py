@@ -33,7 +33,9 @@ def _hat_ton(datei: Path) -> bool:
 
 def _normalisieren(quelle: Path, ziel: Path, hat_ton: bool) -> None:
     """Randet auf 9:16 und ergänzt bei Bedarf eine stille, normalisierte Tonspur."""
-    bild = "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih):black,fps=30,format=yuv420p"
+    # Querformat mit Rand mittig auf 9:16, nie beschneiden.
+    bild = ("scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,fps=30,format=yuv420p")
     if hat_ton:
         graph = f"[0:v]{bild}[v];[0:a]loudnorm=I=-14:TP=-1.5:LRA=11[a]"
         audio_eingang = []
@@ -54,8 +56,10 @@ def _inhalt(transkript_text: str, titel: str | None, beschreibung: str | None) -
     if titel and beschreibung:
         return titel, beschreibung
     antwort = urteil.frage(
-        urteil.vorlage("aufnehmen", transkript=transkript_text, titel=titel or "", beschreibung=beschreibung or ""),
-        zweck="aufnehmen", rueckfall=lambda: {"titel": titel or "Fertiges Video", "aussage": beschreibung or ""},
+        urteil.vorlage("aufnehmen", transkript=transkript_text, titel=titel or "",
+                       beschreibung=beschreibung or ""),
+        zweck="aufnehmen",
+        rueckfall=lambda: {"titel": titel or "Fertiges Video", "aussage": beschreibung or ""},
         pruefe=lambda d: None if isinstance(d, dict) and isinstance(d.get("titel"), str)
         and isinstance(d.get("aussage"), str) and d["titel"].strip() and d["aussage"].strip()
         else "Titel oder Aussage fehlt.",
@@ -78,7 +82,8 @@ def aufnehmen(datei: Path, name: str | None, art: str, titel: str | None, beschr
     arbeit.mkdir(parents=True, exist_ok=True)
     quellpfad = arbeit / f"quelle{datei.suffix.lower() or '.mp4'}"
     shutil.copy2(datei, quellpfad)
-    schreiben(arbeit / "take.json", {"id": name, "quelle": quellpfad.name, "dauer_s": dauer(datei), "status": "aufgenommen"})
+    take = {"id": name, "quelle": quellpfad.name, "dauer_s": dauer(datei), "status": "aufgenommen"}
+    schreiben(arbeit / "take.json", take)
     hat_ton = _hat_ton(datei)
     _normalisieren(datei, ausgabe / "instagram.mp4", hat_ton)
     shutil.copyfile(ausgabe / "instagram.mp4", ausgabe / "tiktok.mp4")
@@ -93,7 +98,8 @@ def aufnehmen(datei: Path, name: str | None, art: str, titel: str | None, beschr
     if not woerter and not beschreibung:
         befund = "Beschreibung fehlt"
         schreiben(ausgabe / "stueck.json", {"id": name, "take": name, "nr": 1, "von_stuecken": 1,
-                 "stil": art, "dauer_s": round(dauer_s, 2), "dateien": {"instagram": "instagram.mp4", "tiktok": "tiktok.mp4"},
+                 "stil": art, "dauer_s": round(dauer_s, 2),
+                 "dateien": {"instagram": "instagram.mp4", "tiktok": "tiktok.mp4"},
                  "status": "befund", "befunde": [befund]})
         return Ergebnis("befund", befund)
 
@@ -120,7 +126,8 @@ def aufnehmen(datei: Path, name: str | None, art: str, titel: str | None, beschr
         befunde.append(cover.meldung)
     status = "befund" if befunde else "fertig"
     schreiben(ausgabe / "stueck.json", {"id": name, "take": name, "nr": 1, "von_stuecken": 1,
-             "stil": art, "dauer_s": round(dauer_s, 2), "dateien": dateien, "status": status, "befunde": befunde})
+             "stil": art, "dauer_s": round(dauer_s, 2), "dateien": dateien,
+             "status": status, "befunde": befunde})
     rezept["status"] = status
     rezept["befunde"] = befunde
     schreiben(rezept_ordner / "rezept.json", rezept)

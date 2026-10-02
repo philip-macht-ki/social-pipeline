@@ -73,3 +73,22 @@ def test_aufnahme_transkribiert_und_laesst_youtube_bei_180_sekunden_weg(repo, mo
     assert aufnehmen.aufnehmen(quelle, "U01", "umbau", None, None).status == "befund"
     assert not (repo / "ausgabe" / "U01" / "youtube.mp4").exists()
     assert lesen(repo / "arbeit" / "U01" / "woerter.json")[0]["w"] == "Hallo."
+
+
+def test_querformat_sitzt_mittig_mit_rand(tmp_path):
+    import subprocess
+    from PIL import Image
+
+    quelle = tmp_path / "quer.mp4"
+    ziel = tmp_path / "hoch.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i",
+                    "color=red:size=1920x1080:rate=30", "-t", "1", str(quelle)], check=True)
+    aufnehmen._normalisieren(quelle, ziel, hat_ton=False)
+    bild = tmp_path / "bild.png"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(ziel), "-frames:v", "1", str(bild)],
+                   check=True)
+    im = Image.open(bild).convert("RGB")
+    assert im.size == (1080, 1920)
+    oben, mitte, unten = im.getpixel((540, 100)), im.getpixel((540, 960)), im.getpixel((540, 1820))
+    assert max(oben) < 30 and max(unten) < 30
+    assert mitte[0] > 180 and mitte[1] < 80

@@ -242,7 +242,9 @@ def _uebermalt_layout(daten: dict) -> dict:
             zeilen = [" ".join(woerter[:i]), " ".join(woerter[i:])]
             if max(breite(z, font) for z in zeilen) <= max_breite:
                 kandidaten.append(zeilen)
-        return min(kandidaten, key=lambda z: abs(breite(z[0], font) - breite(z[1], font))) if kandidaten else None
+        if not kandidaten:
+            return None
+        return min(kandidaten, key=lambda z: abs(breite(z[0], font) - breite(z[1], font)))
 
     # Der Block steht mittig zwischen oben 300 und unten 300 (Sicherheitsrahmen).
     platz = HOEHE - 600
