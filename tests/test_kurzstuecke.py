@@ -193,6 +193,39 @@ def test_merker_verhindert_doppelbau(repo, monkeypatch):
     assert gebaut == ["take"]
 
 
+def test_voller_vorrat_baut_nichts_und_setzt_keinen_merker(repo, monkeypatch):
+    take = _take(repo)
+    for nummer in ("eins", "zwei"):
+        ziel = repo / "ausgabe" / nummer
+        ziel.mkdir()
+        (ziel / "stueck.json").write_text(json.dumps({
+            "id": nummer, "stil": "lesereel", "status": "fertig",
+        }))
+    gebaut = []
+    monkeypatch.setattr(kurzstuecke, "_bauen_lese", lambda name: gebaut.append(name))
+    monkeypatch.setattr(kurzstuecke, "_bauen_uebermalt", lambda name: kurzstuecke.Ergebnis("nichts"))
+    kurzstuecke.befehl(argparse.Namespace(ziel=["take"], neu=False))
+    assert gebaut == []
+    merker = json.loads((take / "take.json").read_text()).get("kurzstuecke", {})
+    assert "lesereel" not in merker
+
+
+def test_veroeffentlichtes_kurzstueck_zaehlt_nicht_zum_vorrat(repo):
+    for nummer in ("eins", "zwei"):
+        ziel = repo / "ausgabe" / nummer
+        ziel.mkdir()
+        (ziel / "stueck.json").write_text(json.dumps({
+            "id": nummer, "stil": "uebermalt", "status": "fertig",
+        }))
+    (repo / "arbeit" / "plan.json").write_text(json.dumps({"eintraege": [{
+        "id": "p-0001", "quelle": "eins",
+    }]}))
+    (repo / "arbeit" / "postlog.json").write_text(json.dumps([{
+        "plan_id": "p-0001", "status": "ok",
+    }]))
+    assert kurzstuecke._vorrat("uebermalt") == 1
+
+
 def test_planen_nimmt_beide_zusatzstuecke_auf(repo):
     _take(repo)
     for suffix, stil in (("lese", "lesereel"), ("uebermalt", "uebermalt")):

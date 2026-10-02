@@ -60,6 +60,10 @@ tage = 7
 # Stille Zusatzreels je Aufnahme einzeln ein- oder ausschalten.
 lesereel = true
 uebermalt = true
+# Je Format liegen höchstens so viele noch unveröffentlichte Zusatzstücke bereit.
+vorrat_hoechstens = 2
+# Zwischen zwei Lese-Reels oder zwei übermalten Sätzen je Kanal liegen mindestens so viele Kalendertage.
+abstand_tage = 2
 
 [ordner]
 eingang = "eingang"

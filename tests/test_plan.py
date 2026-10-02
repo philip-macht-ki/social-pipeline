@@ -98,3 +98,60 @@ def test_instagram_kein_bild_direkt_vor_einem_bild(repo):
     danach = _e(_k(art='karussell', take='alt'), z + timedelta(minutes=1))
     assert not plan._erlaubt(_k(art='bild'), z, [danach], cfg)
     assert plan._erlaubt(_k(art='reel'), z, [danach], cfg)
+
+
+def test_instagram_bilder_an_tagesgrenzen_sind_erlaubt(repo):
+    cfg = {'tagesdeckel': 9, 'mindestabstand_minuten': 0, 'nachtruhe': ['00:00', '00:00']}
+    z = plan._dt(_zeit(120)).replace(hour=0, minute=1)
+    gestern = _e(_k(art='bild', take='gestern'), z - timedelta(minutes=2))
+    morgen = _e(_k(art='karussell', take='morgen'), z + timedelta(days=1))
+    assert plan._erlaubt(_k(art='bild'), z, [gestern], cfg)
+    assert plan._erlaubt(_k(art='bild'), z, [morgen], cfg)
+
+
+def test_planen_haelt_kurzstuecke_je_stil_auseinander(repo, capsys):
+    _cfg(repo, '''[instagram]
+an=true
+weg="upload_post"
+slots=[{zeit="10:00",art="reel"}]
+tagesdeckel=9
+mindestabstand_minuten=0
+nachtruhe=["00:00","00:00"]
+''')
+    for nummer in ("eins", "zwei"):
+        d = repo / 'ausgabe' / nummer
+        d.mkdir()
+        (d / 'instagram.mp4').write_bytes(b'x')
+        (d / 'stueck.json').write_text(json.dumps({
+            'id': nummer, 'status': 'fertig', 'stil': 'lesereel', 'dauer_s': 8,
+            'dateien': {'instagram': 'instagram.mp4'},
+        }))
+        (d / 'texte.json').write_text(json.dumps({'instagram': {'caption': 'Text'}}))
+    plan.befehl_planen(argparse.Namespace(tage=2))
+    eintraege = json.loads((repo / 'arbeit' / 'plan.json').read_text())['eintraege']
+    assert len(eintraege) == 1
+    assert 'befund:' not in capsys.readouterr().out
+
+
+def test_vorziehen_respektiert_kurzstueck_abstand(repo, monkeypatch):
+    _cfg(repo, '''[instagram]
+an=true
+weg="upload_post"
+slots=[{zeit="10:00",art="reel"}]
+tagesdeckel=9
+mindestabstand_minuten=0
+nachtruhe=["00:00","00:00"]
+''')
+    start = kern.jetzt().replace(hour=10, minute=30, second=0, microsecond=0)
+    monkeypatch.setattr(plan, 'jetzt', lambda: start)
+    def eintrag(nummer, tage):
+        return {**_k(take=nummer), 'id': f'p-{nummer}', 'stil': 'uebermalt',
+                'zeit': (start + timedelta(days=tage, hours=2)).isoformat(), 'slot': 1,
+                'status': 'geplant', 'freigegeben': False}
+    (repo / 'arbeit' / 'plan.json').write_text(json.dumps({'eintraege': [
+        eintrag('nah', 2), eintrag('spaet', 3),
+    ]}))
+    daten = json.loads((repo / 'arbeit' / 'plan.json').read_text())
+    daten['eintraege'][0]['status'] = 'veroeffentlicht'
+    (repo / 'arbeit' / 'plan.json').write_text(json.dumps(daten))
+    assert plan.vorziehen(argparse.Namespace(tage=4)) == 0

@@ -32,6 +32,32 @@ def _normale_stuecke(take: str) -> list[dict]:
     return raus
 
 
+def _veroeffentlichte_quellen() -> set[str]:
+    """Ermittelt veröffentlichte Stücke über die erfolgreiche Postlog-Zeile."""
+    plan = lesen(pfad("arbeit", "plan.json"), {}) or {}
+    quellen = {
+        eintrag.get("id"): eintrag.get("quelle")
+        for eintrag in plan.get("eintraege", [])
+    }
+    return {
+        quellen[zeile.get("plan_id")]
+        for zeile in lesen(pfad("arbeit", "postlog.json"), []) or []
+        if zeile.get("status") == "ok" and quellen.get(zeile.get("plan_id"))
+    }
+
+
+def _vorrat(art: str) -> int:
+    """Zählt fertige, noch nicht veröffentlichte Zusatzstücke eines Formats."""
+    veroeffentlicht = _veroeffentlichte_quellen()
+    return sum(
+        1
+        for manifest in pfad("ausgabe").glob("*/stueck.json")
+        if (daten := lesen(manifest, {})).get("stil") == art
+        and daten.get("status") in ("fertig", "befund")
+        and daten.get("id", manifest.parent.name) not in veroeffentlicht
+    )
+
+
 def _verboten(text: str) -> str | None:
     if any(zeichen in text for zeichen in ("\u2013", "\u2014", "(", ")")):
         return "Gedankenstriche oder Klammern sind nicht erlaubt."
@@ -374,6 +400,15 @@ def befehl(args) -> int:
                 continue
             if gebaut.get(art) and not getattr(args, "neu", False):
                 log(f"nichts: {take}: {art} schon geprüft.")
+                continue
+            vorrat = _vorrat(art)
+            hoechstens = cfg.get("vorrat_hoechstens", 2)
+            if vorrat >= hoechstens:
+                ergebnis = Ergebnis(
+                    "nichts",
+                    f"{art} nicht gebaut: Vorrat mit {vorrat} von höchstens {hoechstens} gefüllt.",
+                )
+                log(f"{ergebnis.status}: {take}: {ergebnis.meldung}")
                 continue
             try:
                 ergebnis = funktion(take)

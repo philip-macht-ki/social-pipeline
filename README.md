@@ -80,9 +80,12 @@ mindestens drei Minuten unverändert beobachtet wurden.
 An und aus in `konfig/stile.toml`.
 
 Die beiden Zusatzstücke schaltest du in `konfig/pipeline.toml` unter
-`[kurzstuecke]` einzeln mit `lesereel` und `uebermalt` ein oder aus. Ohne Ziel
-baut `pipeline kurzstuecke` sie für Takes mit fertigen normalen Stücken. Der
-Tageslauf erledigt das nach `bilder` und vor dem zweiten `planen`.
+`[kurzstuecke]` schaltet `lesereel` und `uebermalt` einzeln ein oder aus.
+`vorrat_hoechstens` begrenzt die noch nicht veröffentlichten Stücke je Format,
+`abstand_tage` ihren Abstand je Kanal in Kalendertagen. Ohne Ziel baut
+`pipeline kurzstuecke` sie für Takes mit fertigen normalen Stücken, solange
+der Vorrat Platz hat. Der Tageslauf erledigt das nach `bilder` und vor dem
+zweiten `planen`.
 
 Das Lese-Reel nimmt die Titel und Aussagen aus den Stückrezepten der Aufnahme
 auf. Beide Zusatzstücke bekommen eine kurze Caption aus demselben Modellurteil;

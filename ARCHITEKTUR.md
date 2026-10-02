@@ -51,6 +51,10 @@ trägt zusätzlich `"stil": "lesereel"` beziehungsweise `"uebermalt"`.
 Das Lese-Reel erhält sein Thema aus `titel` und `aussage` der Rezepte eines
 Takes. Beide Zusatzstücke lassen im selben Modellurteil eine kurze Caption
 erzeugen, die mit einer Frage endet.
+`[kurzstuecke].vorrat_hoechstens` begrenzt den ungeposteten Vorrat je Stil;
+eine erfolgreiche Zeile in `postlog.json` zählt dabei als veröffentlicht.
+`abstand_tage` hält beim Planen und Vorziehen je Kanal den Kalenderabstand
+zwischen Lese-Reels beziehungsweise übermalten Sätzen ein.
 Aufgenommene fertige Videos heißen `U01`, `U02` für Umbauten und `W01`, `W02`
 für Werbeclips. Ihr Rezept liegt unter `arbeit/<id>/stuecke/01/`, ihr Manifest
 trägt `"stil": "umbau"` beziehungsweise `"werbeclip"`.
@@ -154,6 +158,7 @@ zwischengespeicherten Gesichtszonen.
    "quelle": "beispiel-01", "take": "beispiel", "teil": 1, "von_teilen": 3,
    "dateien": ["ausgabe/beispiel-01/instagram.mp4"], "text": "…", "titel": "…",
    "zeit": "2026-10-21T09:40:00+02:00", "slot": 3,
+   "stil": "lesereel|uebermalt|null",
    "freigegeben": false, "freigegeben_am": null,
    "status": "geplant|laeuft|veroeffentlicht|fehler", "befunde": []}
 ]}

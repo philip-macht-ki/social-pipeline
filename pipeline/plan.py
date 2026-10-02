@@ -71,6 +71,7 @@ def _kandidaten() -> list[dict]:
                 "text": text_dieses_kanals.get("caption", text_dieses_kanals.get("beschreibung", "")),
                 "titel": text_dieses_kanals.get("titel", ""),
                 "dauer_s": d.get("dauer_s", 0),
+                "stil": d.get("stil"),
                 "befunde": list(d.get("befunde", [])) + list(tex.get("befunde", [])),
             })
     for f in sorted(pfad("ausgabe", "bilder").glob("*/bild.json")):
@@ -94,6 +95,7 @@ def _kandidaten() -> list[dict]:
             "text": text.get("text", text.get("beschreibung", "")),
             "titel": text.get("titel", ""),
             "dauer_s": 0,
+            "stil": d.get("stil"),
             "befunde": d.get("befunde", []),
         })
     return raus
@@ -116,6 +118,15 @@ def _erlaubt(kandidat: dict, zeit: datetime, eintraege: list[dict], cfg: dict, t
     abstand = cfg.get("mindestabstand_minuten", 0)
     if abstand and any(abs((_dt(e["zeit"]) - zeit).total_seconds()) < abstand * 60 for e in gleiche):
         return False
+    stil = kandidat.get("stil")
+    if stil in ("lesereel", "uebermalt"):
+        kurz_cfg = konfig("pipeline").get("kurzstuecke", {})
+        tage = kurz_cfg.get("abstand_tage", 2)
+        if any(
+            e.get("stil") == stil and abs((_dt(e["zeit"]).date() - zeit.date()).days) < tage
+            for e in gleiche
+        ):
+            return False
     # Reihenfolge und Nachbarschaft gelten auch beim Vorziehen.
     vorher = sorted((e for e in gleiche if _dt(e["zeit"]) < zeit), key=lambda e: e["zeit"])
     nachher = sorted((e for e in gleiche if _dt(e["zeit"]) > zeit), key=lambda e: e["zeit"])
@@ -142,12 +153,15 @@ def _erlaubt(kandidat: dict, zeit: datetime, eintraege: list[dict], cfg: dict, t
                 e.get("take") == kandidat["take"] and e.get("teil") == kandidat["teil"] - 1
                 and _dt(e["zeit"]) < zeit for e in gleiche):
             return False
-    if kandidat["kanal"] == "instagram" and _art(kandidat["art"]) in ("bild", "karussell"):
-        if vorher and _art(vorher[-1]["art"]) in ("bild", "karussell"):
+    gleiche_tag = [e for e in gleiche if _dt(e["zeit"]).date() == zeit.date()]
+    vorher_am_tag = sorted((e for e in gleiche_tag if _dt(e["zeit"]) < zeit), key=lambda e: e["zeit"])
+    nachher_am_tag = sorted((e for e in gleiche_tag if _dt(e["zeit"]) > zeit), key=lambda e: e["zeit"])
+    if kandidat["kanal"] == "instagram" and _art(kandidat["art"]) == "bild":
+        if vorher_am_tag and _art(vorher_am_tag[-1]["art"]) == "bild":
             return False
         # Auch nach hinten prüfen: Beim Vorziehen kann ein Bild direkt vor ein
         # schon geplantes Bild rutschen.
-        if nachher and _art(nachher[0]["art"]) in ("bild", "karussell"):
+        if nachher_am_tag and _art(nachher_am_tag[0]["art"]) == "bild":
             return False
     return True
 
@@ -222,7 +236,7 @@ def befehl_planen(args) -> int:
                 for i, k in [wahl] if wahl else []:
                     eintrag = {feld: k[feld] for feld in
                                ("quelle", "take", "teil", "von_teilen", "kanal", "art", "dateien", "text",
-                                "titel", "befunde")}
+                                "titel", "stil", "befunde")}
                     eintrag.update({
                         "id": f"p-{naechste_nr:04d}", "zeit": zeit.isoformat(), "slot": slot,
                         "freigegeben": pauschal_frei,
@@ -240,8 +254,12 @@ def befehl_planen(args) -> int:
     if vorgezogen:
         meldung += f" {vorgezogen} vorgezogen."
     print(meldung)
-    if kandidaten:
-        print(f"befund: {len(kandidaten)} fertige Beiträge fanden keinen passenden Slot.")
+    ohne_kurzstuecke = [
+        kandidat for kandidat in kandidaten
+        if kandidat.get("stil") not in ("lesereel", "uebermalt")
+    ]
+    if ohne_kurzstuecke:
+        print(f"befund: {len(ohne_kurzstuecke)} fertige Beiträge fanden keinen passenden Slot.")
     return 0
 
 
