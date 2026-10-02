@@ -62,7 +62,7 @@ Was dabei passiert:
    Zeichenfolge, die mit `sk-or-` beginnt).
 2. **Schlüssel im Schlüsselbund.** Gib den Schlüssel nie in den Chat.
    Claude legt ihn für dich im macOS-Schlüsselbund unter dem Namen
-   `openrouter-api-key` ab, du fügst den Wert nur einmal in den
+   `openrouter-api-key` ab (der ältere Eintrag `openrouter-insta` wird auch gelesen), du fügst den Wert nur einmal in den
    Schlüsselbund-Dialog ein. Von da an liest jedes Werkzeug hier ihn selbst
    aus. Wer lieber eine Umgebungsvariable nutzt, setzt stattdessen
    `OPENROUTER_API_KEY`.

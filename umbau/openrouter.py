@@ -2,7 +2,8 @@
 """Zugriff auf die OpenRouter-Videoschnittstelle.
 
 Der Schlüssel kommt aus der Umgebungsvariable OPENROUTER_API_KEY, sonst aus dem
-macOS-Schlüsselbund (Eintrag "openrouter-api-key"). Er wird nie ausgegeben,
+macOS-Schlüsselbund (Eintrag "openrouter-api-key", sonst "openrouter-insta").
+Er wird nie ausgegeben,
 auch nicht in Fehlermeldungen.
 """
 from __future__ import annotations
@@ -15,6 +16,7 @@ import urllib.error
 import urllib.request
 
 BASIS = "https://openrouter.ai/api/v1"
+SCHLUESSELBUND = ("openrouter-api-key", "openrouter-insta")
 
 ENDZUSTAENDE_OK = ("completed", "succeeded", "success")
 ENDZUSTAENDE_FEHLER = ("failed", "error", "cancelled")
@@ -26,17 +28,18 @@ def schluessel() -> str:
     wert = os.environ.get("OPENROUTER_API_KEY")
     if wert:
         return wert
-    out = subprocess.run(
-        ["security", "find-generic-password", "-s", "openrouter-api-key", "-w"],
-        capture_output=True, text=True,
-    )
-    wert = out.stdout.strip()
-    if not wert:
-        raise RuntimeError(
-            "Kein OpenRouter-Schlüssel gefunden. Setz OPENROUTER_API_KEY oder "
-            "leg ihn im Schlüsselbund unter 'openrouter-api-key' ab."
+    for eintrag in SCHLUESSELBUND:
+        out = subprocess.run(
+            ["security", "find-generic-password", "-s", eintrag, "-w"],
+            capture_output=True, text=True,
         )
-    return wert
+        wert = out.stdout.strip()
+        if wert:
+            return wert
+    raise RuntimeError(
+        "Kein OpenRouter-Schlüssel gefunden. Setz OPENROUTER_API_KEY oder "
+        "leg ihn im Schlüsselbund unter 'openrouter-api-key' ab."
+    )
 
 
 def req(method: str, path: str, body: dict | None = None) -> tuple[int, bytes]:

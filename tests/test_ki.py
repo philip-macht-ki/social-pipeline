@@ -80,7 +80,8 @@ def test_plan_nutzt_prompt_ueber_den_echten_urteil_weg(repo, monkeypatch):
 
 
 def test_seedance_sendet_keinen_ausschnitt_aus_der_aufnahme(monkeypatch, tmp_path):
-    import storyboard_video
+    # Dasselbe Modulobjekt wie in ki_einblendung, nicht der bare import aus umbau/.
+    from umbau import storyboard_video
 
     aufruf = {}
     monkeypatch.setattr(ki_einblendung.budget, "reservieren", lambda *a: "buchung")
@@ -188,6 +189,16 @@ def test_deckel_meldet_je_monat_nur_einmal(repo, monkeypatch):
     ]})
     assert not budget.darf("flux", 1)
     assert len(aufrufe) == 2
+
+
+def test_zu_grosser_einzelauftrag_meldet_keinen_deckel(repo, monkeypatch):
+    aufrufe = []
+    monkeypatch.setattr(budget.sys, "platform", "darwin")
+    monkeypatch.setattr(budget.subprocess, "run", lambda *a, **k: aufrufe.append(a))
+    monkeypatch.setattr(budget, "jetzt", _zeit(1))
+    assert not budget.darf("seedance", 300)
+    assert budget.darf("seedance", 4)
+    assert aufrufe == []
 
 
 def test_einsetzen_mit_kuenstlichem_clip(tmp_path):

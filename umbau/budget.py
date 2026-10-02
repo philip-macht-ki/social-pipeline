@@ -63,10 +63,12 @@ def darf(art: str, sekunden: float) -> bool:
     if art == "ltx":
         return True
     daten = _daten()
-    erlaubt = _verbrauch(daten) + _preis(art, sekunden) <= _deckel()
-    if not erlaubt or _verbrauch(daten) >= _deckel():
+    verbrauch = _verbrauch(daten)
+    if verbrauch >= _deckel():
         _melden(daten)
-    return erlaubt
+    # Ein Einzelauftrag, der nicht mehr hineinpasst, wird abgelehnt, meldet aber
+    # keinen erreichten Deckel: der Rest bleibt fuer kleinere Auftraege frei.
+    return verbrauch + _preis(art, sekunden) <= _deckel()
 
 
 def reservieren(art: str, sekunden: float, wofuer: str) -> str:
