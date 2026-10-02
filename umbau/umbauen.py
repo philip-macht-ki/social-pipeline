@@ -18,8 +18,14 @@ import json
 import sys
 import time
 
-from hochladen import kurzlebiger_link
-import openrouter as orv
+try:
+    from .hochladen import kurzlebiger_link
+    from . import openrouter as orv
+    from . import budget
+except ImportError:  # Direkter Aufruf als Skript.
+    from hochladen import kurzlebiger_link
+    import openrouter as orv
+    import budget
 
 STANDARD_MODELL = "black-forest-labs/flux-video-edit"
 WARTE_SEKUNDEN = 30
@@ -65,15 +71,29 @@ def starten(url: str, prompt: str, modell: str, dauer: int | None) -> dict:
     raise RuntimeError("Unerwarteter Zustand beim Starten des Auftrags.")
 
 
-def umbauen(eingang: str, ziel: str, prompt: str, modell: str = STANDARD_MODELL, dauer: int | None = None) -> dict:
-    with kurzlebiger_link(eingang) as url:
-        auftrag = starten(url, prompt, modell, dauer)
-        auftrag_id = auftrag.get("id") or auftrag.get("data", {}).get("id")
-        print("Auftrag", auftrag_id, flush=True)
-        ergebnis = orv.warten(auftrag_id)
-        orv.laden(auftrag_id, ziel)
-        print("OK", ziel, "Kosten:", ergebnis.get("usage") or ergebnis.get("cost"))
-        return ergebnis
+def umbauen(eingang: str, ziel: str, prompt: str, modell: str = STANDARD_MODELL, dauer: int | None = None,
+            budgetiert: bool = False) -> dict:
+    sekunden = float(dauer or 0)
+    if not budgetiert and not budget.darf("flux", sekunden):
+        raise RuntimeError("KI-Monatsdeckel erreicht, Umbau nicht gestartet.")
+    nummer = None if budgetiert else budget.reservieren("flux", sekunden, ziel)
+    ok = False
+    kosten = None
+    try:
+        with kurzlebiger_link(eingang) as url:
+            auftrag = starten(url, prompt, modell, dauer)
+            auftrag_id = auftrag.get("id") or auftrag.get("data", {}).get("id")
+            print("Auftrag", auftrag_id, flush=True)
+            ergebnis = orv.warten(auftrag_id)
+            orv.laden(auftrag_id, ziel)
+            nutzung = ergebnis.get("usage") or {}
+            kosten = nutzung.get("cost") if isinstance(nutzung, dict) else ergebnis.get("cost")
+            ok = True
+            print("OK", ziel, "Kosten:", ergebnis.get("usage") or ergebnis.get("cost"))
+            return ergebnis
+    finally:
+        if nummer:
+            budget.abschliessen(nummer, kosten, ok)
 
 
 def main() -> None:

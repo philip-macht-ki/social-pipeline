@@ -54,6 +54,7 @@ nur, was freigegeben ist.
 | Veröffentlichen | `pipeline posten --echt` | Code |
 | Lücken melden | `pipeline vorrat`, `pipeline status` | Code |
 | Verbrauch ansehen | `pipeline verbrauch` | Code |
+| KI-Monatsbudget ansehen | `pipeline ki-budget` | Code |
 | Alles in einem Lauf | `pipeline tag` | |
 | Automatisch alle 20 Minuten | `pipeline zeitplan einrichten` | |
 
@@ -119,6 +120,11 @@ bleiben echt. Dasselbe Werkzeug kann auch Clips ganz ohne Kamera erzeugen,
 aus einem gemalten Storyboard. Beides erklärt `umbau/README.md`, dazu Kosten
 in Euro je Sekunde, Modellwahl und die Fallen aus dem echten Betrieb. Im Kurs
 ist das Modul S7 „KI-Video: umbauen und erzeugen".
+
+Unter `[ki]` in `konfig/pipeline.toml` steht der Monatsdeckel fuer kostenpflichtige
+KI-Videos. `einblendung = false` ist der sichere Standard. Wenn sie eingeschaltet
+ist, setzt die Pipeline hoechstens eine kurze Szene je Reel ein und faellt bei
+fehlendem Budget oder Modell immer auf das normale Rohvideo zurueck.
 
 ## Lizenz
 

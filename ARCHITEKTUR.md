@@ -37,6 +37,8 @@ arbeit/postlog.json            siehe unten
 arbeit/urteile.jsonl           jedes Modellurteil, eine Zeile je Aufruf
 arbeit/cache/urteile/<hash>.json   Zwischenspeicher, 7 Tage
 arbeit/logs/<datum>.log        Protokoll je Tag
+arbeit/ki_budget.json          KI-Buchungen des Monats und Deckelstatus
+arbeit/ki_rotation.json        Zaehler fuer die Wahl der KI-Einblendung
 ausgabe/<stueck_id>/           fertige Dateien je Stück, siehe unten
 ausgabe/bilder/<bild_id>/      fertige Bildbeiträge, siehe unten
 medien/hintergruende/          eigene Fotos für Pinterest-Stile mit Foto (optional)
@@ -66,6 +68,7 @@ medien/hintergruende/          eigene Fotos für Pinterest-Stile mit Foto (optio
 
 ```
 roh.mp4            Rohschnitt 1080x1920, 30 fps, Ton normalisiert, ohne Schrift
+roh_ki.mp4         optional: Rohschnitt mit einer KI-Einblendung, Ton unveraendert
 zeitachse.json     {"segmente": [[s,e],…] (Quellzeit), "woerter": [{"w","s","e"}] (neue Zeit), "dauer_s"}
 instagram.mp4      Fassung mit Schrift-Ebene, ≤ 82 MB
 tiktok.mp4         Untertitel höher (TikTok-Leiste), H.264
@@ -150,3 +153,4 @@ Eine Liste. **Schlüssel ist immer (kanal, plan_id).** Wer liest, filtert nach K
 | `texte.py`, `stile/` | texte, bilder |
 | `plan.py`, `posten/`, `betrieb.py` | planen, zeigen, freigeben, posten, vorrat, status, zeitplan, instagram-token, youtube-anmelden |
 | `cli.py`, `pruefen.py` | pruefen, tag |
+| `ki_einblendung.py`, `umbau/budget.py` | ki-budget |

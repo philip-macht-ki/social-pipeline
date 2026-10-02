@@ -16,6 +16,14 @@ sprache = "de"
 zeitzone = "Europe/Berlin"
 gesamtzeit_minuten = 50
 
+[ki]
+# Monatlicher Hoechstbetrag fuer kostenpflichtige KI-Videos. LTX bleibt lokal und kostenlos.
+deckel_eur = 20
+# Eine kurze KI-Szene im Reel einsetzen. Erst bewusst einschalten, wenn LTX oder OpenRouter bereit ist.
+einblendung = false
+# Ordner der lokalen Installation von ltx-2-mlx. Leer lassen, wenn LTX nicht installiert ist.
+ltx_ordner = ""
+
 [schnitt]
 min_laenge = 30
 max_laenge = 170

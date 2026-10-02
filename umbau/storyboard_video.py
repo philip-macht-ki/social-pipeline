@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Storyboard-Bild zu Video mit bytedance/seedance-2.0 über OpenRouter.
+"""Storyboard-Bild oder Text zu Video mit bytedance/seedance-2.0 über OpenRouter.
 
 Für Clips ohne eigene Aufnahme: ein Storyboard (zum Beispiel 2 Spalten x 5
 Zeilen, ein Feld je Sekunde) wird als Referenzbild mitgeschickt, Seedance setzt
@@ -16,8 +16,14 @@ import argparse
 import json
 import sys
 
-from hochladen import kurzlebiger_link
-import openrouter as orv
+try:
+    from .hochladen import kurzlebiger_link
+    from . import openrouter as orv
+    from . import budget
+except ImportError:  # Direkter Aufruf als Skript.
+    from hochladen import kurzlebiger_link
+    import openrouter as orv
+    import budget
 
 STANDARD_MODELL = "bytedance/seedance-2.0"
 
@@ -44,29 +50,36 @@ def standardwerte(modell: str) -> tuple[int, str]:
 
 
 def erzeugen(
-    bild: str,
+    bild: str | None,
     ziel: str,
     prompt: str,
     modell: str = STANDARD_MODELL,
     dauer: int | None = None,
     size: str | None = None,
+    budgetiert: bool = False,
 ) -> dict:
     auto_dauer, auto_size = standardwerte(modell)
     dauer = dauer if dauer is not None else auto_dauer
     size = size if size is not None else auto_size
-    with kurzlebiger_link(bild) as url:
-        status, antwort = orv.req(
-            "POST",
-            "/videos",
-            {
-                "model": modell,
-                "prompt": prompt,
-                "duration": dauer,
-                "size": size,
-                "generate_audio": False,
-                "input_references": [{"type": "image_url", "image_url": {"url": url}}],
-            },
-        )
+    if not budgetiert and not budget.darf("seedance", dauer):
+        raise RuntimeError("KI-Monatsdeckel erreicht, Storyboard nicht gestartet.")
+    nummer = None if budgetiert else budget.reservieren("seedance", dauer, ziel)
+    ok = False
+    kosten = None
+    try:
+        anfrage = {
+            "model": modell,
+            "prompt": prompt,
+            "duration": dauer,
+            "size": size,
+            "generate_audio": False,
+        }
+        if bild:
+            with kurzlebiger_link(bild) as url:
+                anfrage["input_references"] = [{"type": "image_url", "image_url": {"url": url}}]
+                status, antwort = orv.req("POST", "/videos", anfrage)
+        else:
+            status, antwort = orv.req("POST", "/videos", anfrage)
         if status >= 300:
             raise RuntimeError(f"FEHLER {status}: {antwort.decode(errors='replace')[:800]}")
         auftrag = json.loads(antwort)
@@ -74,8 +87,14 @@ def erzeugen(
         print("Auftrag", auftrag_id, flush=True)
         ergebnis = orv.warten(auftrag_id, intervall=15)
         orv.laden(auftrag_id, ziel)
+        nutzung = ergebnis.get("usage") or {}
+        kosten = nutzung.get("cost") if isinstance(nutzung, dict) else ergebnis.get("cost")
+        ok = True
         print("OK", ziel, "Kosten:", ergebnis.get("usage") or ergebnis.get("cost"))
         return ergebnis
+    finally:
+        if nummer:
+            budget.abschliessen(nummer, kosten, ok)
 
 
 def main() -> None:

@@ -336,6 +336,21 @@ def test_erzeugen_laesst_ausdrueckliche_werte_unangetastet(monkeypatch, tmp_path
     assert aufgezeichnet["body"]["size"] == "1080x1920"
 
 
+def test_erzeugen_ohne_bild_sendet_reines_text_zu_video(monkeypatch, tmp_path):
+    aufgezeichnet = {}
+
+    def fake_req(method, path, body=None):
+        aufgezeichnet["body"] = body
+        return 200, b'{"id": "abc"}'
+
+    monkeypatch.setattr(storyboard_video.orv, "req", fake_req)
+    monkeypatch.setattr(storyboard_video.orv, "warten", lambda *a, **k: {"usage": 0})
+    monkeypatch.setattr(storyboard_video.orv, "laden", lambda *a, **k: None)
+    storyboard_video.erzeugen(None, str(tmp_path / "ziel.mp4"), "empty room", budgetiert=True)
+    assert aufgezeichnet["body"]["prompt"] == "empty room"
+    assert "input_references" not in aufgezeichnet["body"]
+
+
 # --- Schlüssel wird nie in Ausgaben geschrieben ---------------------------
 
 
